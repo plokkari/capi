@@ -2,12 +2,17 @@ name: Build & Deploy Flappy Capy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]   # change to master if your default branch is master
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+# Prevent overlapping deployments
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -48,10 +53,13 @@ jobs:
       - name: Ensure build dir exists
         run: mkdir -p build/web
 
+      # Start pygbag, wait for .wasm to appear, then stop server
       - name: Build with pygbag (timeout + wait for files)
         run: |
           set -e
           python -m pygbag main.py & PID=$!
+
+          # wait up to ~3 minutes for the web bundle to appear
           for i in $(seq 1 90); do
             if [ -f build/web/index.html ] && ls build/web/*.wasm >/dev/null 2>&1; then
               echo "✅ Web build detected."
@@ -60,48 +68,77 @@ jobs:
             echo "⏳ Waiting for build... ($i/90)"
             sleep 2
           done
-          kill $PID || true
-          ls -la build/web
 
-      # Optional: hide pygbag corner/overlay & auto-start inside the game
-      - name: Patch game HTML (autostart + hide corner)
+          # stop the background server if still running
+          kill $PID || true
+
+          echo "Contents of build/web:"
+          ls -la build/web || (echo "❌ build/web missing" && exit 1)
+
+      # Patch the generated game HTML:
+      #  - Autostart (click typical run/start button)
+      #  - Hide top-left loading/status text and any overlay/badges
+      - name: Patch game HTML (autostart + hide corner/overlays)
         run: |
           python - <<'PY'
           import os, io
           p = "build/web/index.html"
           if os.path.isfile(p):
-              patch = """
+              patch = r"""
           <style>
-            /* hide common top-right overlays/badges that pygbag/emscripten templates add */
+            /* Hide common top-left status/messages from pygbag/emscripten */
+            #output, .emscripten, .status, pre, .spinner, .emscripten_border {
+              display:none !important; visibility:hidden !important;
+            }
+            /* Hide common top-right overlays/badges/toolbars */
             #github-corner, .corner, .top-right, .badge, .toolbar, a[href*="github.com"]{
               display:none !important; visibility:hidden !important;
             }
           </style>
           <script>
           window.addEventListener("load", () => {
-            const clickRun = () => {
+            const tryClick = () => {
               const btn = document.getElementById("run") || document.querySelector(".run, #start, .start, button");
               try { if (btn) btn.click(); } catch(e){}
             };
-            clickRun(); setTimeout(clickRun,150); setTimeout(clickRun,300);
+            // Attempt several times in case UI mounts late
+            tryClick(); setTimeout(tryClick,150); setTimeout(tryClick,300);
+            // Also try sending SPACE/ENTER
+            const sendKey = (k)=>{document.dispatchEvent(new KeyboardEvent("keydown",{key:k,bubbles:true}));document.dispatchEvent(new KeyboardEvent("keyup",{key:k,bubbles:true}));};
+            setTimeout(()=>{ sendKey(" "); sendKey("Enter"); }, 350);
           });
           </script>
               """
               with io.open(p, "a", encoding="utf-8") as f:
-                  f.write("\\n"+patch+"\\n")
+                  f.write("\n"+patch+"\n")
               print("Patched:", p)
           else:
               print("Skipping patch; file not found:", p)
           PY
 
-      # Prepare a site/ folder with wrapper at root and game under /game
+      # Prepare a site/ folder with your wrapper at root and the game under /game
       - name: Prepare site folder
         run: |
+          set -e
           mkdir -p site/game
           cp -r build/web/* site/game/
-          # Ensure wrapper uses /game/index.html
-          sed -i 's|build/web/index.html|game/index.html|g' index.html || true
-          cp index.html site/index.html
+
+          # Ensure wrapper uses /game/index.html (update if your wrapper already exists)
+          if [ -f "index.html" ]; then
+            sed -i 's|build/web/index.html|game/index.html|g' index.html || true
+            sed -i 's|GAME_URL\\s*=\\s*".*"|const GAME_URL = "game/index.html";|g' index.html || true
+            cp index.html site/index.html
+          else
+            # Fallback minimal wrapper if none present
+            cat > site/index.html <<'HTML'
+            <!DOCTYPE html>
+            <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+            <title>Flappy Capy 🐹</title></head>
+            <body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#111;color:#fff">
+              <iframe src="game/index.html" style="width:420px;height:640px;border:0;border-radius:12px;background:#000" allow="autoplay; fullscreen"></iframe>
+            </body></html>
+            HTML
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
