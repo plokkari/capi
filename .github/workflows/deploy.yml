@@ -2,7 +2,7 @@ name: Build & Deploy Flappy Capy
 
 on:
   push:
-    branches: [ main ]   # change if your default branch is different
+    branches: [ main ]   # change to master if your default branch is master
 
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           version: latest
 
-      # Force pygbag to build for web (not APK) & avoid config parser issue
+      # Force pygbag to build for the web (not APK) & avoid config parser issue
       - name: Create pygbag.ini
         run: |
           cat > pygbag.ini <<'EOF'
@@ -47,14 +47,30 @@ jobs:
           ignoredirs  =
           EOF
 
-      # PRE-CREATE the output dir so zipfile/pack doesn't fail
       - name: Ensure build dir exists
         run: mkdir -p build/web
 
-      - name: Build with pygbag
+      # Start pygbag, wait for .wasm to appear, then stop server
+      - name: Build with pygbag (timeout + wait for files)
         run: |
-          python -m pygbag main.py
-          ls -la build/web || true
+          set -e
+          python -m pygbag main.py & PID=$!
+
+          # wait up to ~3 minutes for the web bundle to appear
+          for i in $(seq 1 90); do
+            if [ -f build/web/index.html ] && ls build/web/*.wasm >/dev/null 2>&1; then
+              echo "✅ Web build detected."
+              break
+            fi
+            echo "⏳ Waiting for build... ($i/90)"
+            sleep 2
+          done
+
+          # stop the background server if still running
+          kill $PID || true
+
+          echo "Contents of build/web:"
+          ls -la build/web || (echo "❌ build/web missing" && exit 1)
 
       # Optional: auto-start patch to skip green overlay on mobile
       - name: Auto-start patch (skip green overlay)
