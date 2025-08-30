@@ -2,6 +2,7 @@ import pygame
 import sys
 import random
 import time
+import math
 
 # =========================
 #  SETUP
@@ -17,7 +18,7 @@ FONT = pygame.font.SysFont("Arial", 32)
 # --- Game variables ---
 gravity = 0.5
 capy_movement = 0
-game_active = True
+game_state = "start"   # "start" | "play" | "gameover"
 score = 0
 high_score = 0
 
@@ -74,25 +75,18 @@ def make_pillar_surface(gap_y, gap_size):
 
         # horizontal “coin bands” (clamped so they don't reach the gap edge)
         band_h = 22
-        y = rect.top
-        while y < rect.bottom:
-            band_y = min(rect.bottom - 5, y + band_h - 2)  # keep away from edge
-            if band_y >= rect.top:
-                pygame.draw.rect(surf, coin_edge, (rect.left + 3, band_y, OBSTACLE_WIDTH - 6, 3))
+        y = rect.top + 10
+        while y < rect.bottom - 10:
+            band_top = max(rect.top + 2, y)
+            band_bottom = min(rect.bottom - 2, y + 6)
+            if band_bottom > band_top:
+                pygame.draw.rect(surf, coin_edge, (rect.left + 4, band_top, rect.width - 8, band_bottom - band_top))
             y += band_h
 
-    # Draw using clip to strictly confine pixels to each section
-    if top_rect.height > 0:
-        surf.set_clip(top_rect)
-        draw_section(top_rect)
-    if bottom_rect.height > 0:
-        surf.set_clip(bottom_rect)
-        draw_section(bottom_rect)
+    draw_section(top_rect)
+    draw_section(bottom_rect)
 
-    # Reset clip
-    surf.set_clip(None)
-
-    # Hard-clear the gap to ensure FULL transparency
+    # Punch out the gap so it's fully transparent
     gap_rect = pygame.Rect(0, gap_top, OBSTACLE_WIDTH, max(0, gap_bot - gap_top))
     if gap_rect.height > 0:
         surf.fill((0, 0, 0, 0), gap_rect)
@@ -145,22 +139,34 @@ def check_collision_single_column():
         return False
     return True
 
-# Spawn timer (reuse your cadence)
+# Spawn timer
 SPAWNPIPE = pygame.USEREVENT
 pygame.time.set_timer(SPAWNPIPE, 1200)  # every 1.2s
 
 # =========================
-#  SCORE
+#  UI HELPERS
 # =========================
-def score_display(game_state):
-    if game_state == "main":
+def draw_text_center(text, size, y, color=(255,255,255)):
+    f = pygame.font.SysFont("Arial", size, bold=True)
+    s = f.render(text, True, color)
+    SCREEN.blit(s, (WIDTH // 2 - s.get_width() // 2, y))
+
+def score_display(mode):
+    if mode == "main":
         s = FONT.render(f"Score: {int(score)}", True, (255, 255, 255))
         SCREEN.blit(s, (10, 10))
-    else:
+    elif mode == "game_over":
         s  = FONT.render(f"Score: {int(score)}", True, (255, 255, 255))
         hs = FONT.render(f"High Score: {int(high_score)}", True, (255, 255, 255))
-        SCREEN.blit(s,  (WIDTH // 2 - s.get_width() // 2,  HEIGHT // 2 - 30))
-        SCREEN.blit(hs, (WIDTH // 2 - hs.get_width() // 2, HEIGHT // 2 + 10))
+        SCREEN.blit(s,  (WIDTH // 2 - s.get_width() // 2,  HEIGHT // 2 - 40))
+        SCREEN.blit(hs, (WIDTH // 2 - hs.get_width() // 2, HEIGHT // 2))
+
+def reset_game():
+    global capy_movement, score, obstacles
+    capy_rect.center = (100, HEIGHT // 2)
+    capy_movement = 0
+    obstacles = []
+    score = 0
 
 # =========================
 #  MAIN LOOP
@@ -172,37 +178,44 @@ while True:
     dt = now - last_time
     last_time = now
 
+    # Reflect state into a convenience bool for existing code paths
+    game_active = (game_state == "play")
+
     # Event handling
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
 
-        # Spacebar jump or restart
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE and game_active:
-                capy_movement = 0
-                capy_movement -= 10
-            if event.key == pygame.K_SPACE and not game_active:
-                # Restart
-                game_active = True
-                obstacles.clear()
-                capy_rect.center = (100, HEIGHT // 2)
-                capy_movement = 0
-                score = 0
+            # Global shortcuts
+            if event.key == pygame.K_ESCAPE:
+                pygame.quit()
+                sys.exit()
 
-        # Mouse/tap jump or restart
+            if game_state == "start":
+                if event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
+                    reset_game()
+                    game_state = "play"
+
+            elif game_state == "play":
+                if event.key == pygame.K_SPACE:
+                    capy_movement = -10  # flap
+
+            elif game_state == "gameover":
+                if event.key == pygame.K_r:
+                    reset_game()
+                    game_state = "play"
+
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if game_active:
-                capy_movement = 0
-                capy_movement -= 10
-            else:
-                # Restart
-                game_active = True
-                obstacles.clear()
-                capy_rect.center = (100, HEIGHT // 2)
-                capy_movement = 0
-                score = 0
+            if game_state == "start":
+                reset_game()
+                game_state = "play"
+            elif game_state == "play":
+                capy_movement = -10
+            elif game_state == "gameover":
+                reset_game()
+                game_state = "play"
 
         if event.type == SPAWNPIPE and game_active:
             spawn_obstacle()
@@ -210,7 +223,15 @@ while True:
     # Background
     SCREEN.blit(background_img, (0, 0))
 
-    if game_active:
+    if game_state == "start":
+        # Idle capy float
+        capy_rect.centery = int(HEIGHT * 0.55 + 8 * math.sin(pygame.time.get_ticks() * 0.005))
+        SCREEN.blit(capy_img, capy_img.get_rect(center=capy_rect.center))
+        draw_text_center("Flappy Capy 🐹", 40, HEIGHT//4)
+        draw_text_center("Press SPACE or TAP to Start", 22, HEIGHT//2)
+        draw_text_center("SPACE to flap • ESC to quit", 18, int(HEIGHT*0.72))
+
+    elif game_active:
         # Capy physics
         capy_movement += gravity
         capy_rect.centery += capy_movement
@@ -226,7 +247,8 @@ while True:
         draw_obstacles()
 
         # Collisions
-        game_active = check_collision_single_column()
+        if not check_collision_single_column():
+            game_state = "gameover"
 
         # --- SCORE WHEN PASSING A PILLAR ---
         # When the pillar's right edge passes the capy's left edge and not counted yet -> +1
@@ -238,10 +260,20 @@ while True:
         # HUD
         score_display("main")
 
-    else:
+    else:  # gameover
+        # Keep last frame visible (draw obstacles + capy at rest)
+        draw_obstacles()
+        SCREEN.blit(capy_img, capy_img.get_rect(center=capy_rect.center))
+
+        # Update high score
         if score > high_score:
             high_score = score
+
+        # Overlay
+        draw_text_center("Game Over!", 42, HEIGHT//4, (255,80,80))
         score_display("game_over")
+        draw_text_center("Press R to Try Again", 22, int(HEIGHT*0.68))
+        draw_text_center("ESC to quit", 18, int(HEIGHT*0.78))
 
     pygame.display.update()
     CLOCK.tick(60)

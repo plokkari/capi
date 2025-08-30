@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Flappy Capy 🐹</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      font-family: Arial, sans-serif; background: linear-gradient(180deg, #1a1a2e, #16213e); color: #fff;
+    }
+    .wrap {
+      min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 20px; padding: 16px;
+    }
+    h1 { margin: 0; font-size: 2.2rem; text-align: center; }
+    p  { margin: 0 0 8px; text-align: center; opacity: 0.9; }
+    .btn {
+      display: inline-block; padding: 14px 24px; font-size: 1.1rem; font-weight: 700;
+      color: #fff; background: #e94560; border-radius: 10px; text-decoration: none; border: 0;
+    }
+    .btn:active { transform: scale(0.98); }
+    .game-area { width: 100%; max-width: 420px; display: none; flex-direction: column; align-items: center; gap: 8px; }
+    .game-frame {
+      width: 100%; height: 640px; border: 0; border-radius: 10px; background: #000;
+    }
+    footer { text-align: center; margin-top: 16px; opacity: 0.6; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Flappy Capy 🐹</h1>
+    <p>Guide the business Capybara through the obstacles and earn your airdrops!</p>
+
+    <button id="play" class="btn">▶ Play Game</button>
+
+    <div id="gameArea" class="game-area">
+      <iframe id="gameFrame" class="game-frame" allow="autoplay; fullscreen"></iframe>
+      <small>Tip: tap anywhere inside the game to flap.</small>
+    </div>
+
+    <footer>Made with ❤️ for the CapyCoin community</footer>
+  </div>
+
+  <script>
+    // Where pygbag outputs your game:
+    const GAME_URL = "build/web/index.html";
+
+    const playBtn   = document.getElementById("play");
+    const gameArea  = document.getElementById("gameArea");
+    const gameFrame = document.getElementById("gameFrame");
+
+    // On mobile, a user gesture is required anyway, so we load the iframe on tap/click.
+    function startGame() {
+      // Show the container and set iframe src
+      gameArea.style.display = "flex";
+      if (gameFrame.src !== location.origin + "/" + GAME_URL && !gameFrame.src.endsWith(GAME_URL)) {
+        gameFrame.src = GAME_URL;
+      }
+
+      // When the iframe loads, try to "click" the internal "Ready to start!" button automatically.
+      gameFrame.addEventListener("load", () => {
+        try {
+          const doc = gameFrame.contentDocument || gameFrame.contentWindow.document;
+          // Try some likely selectors that pygbag’s template uses
+          const runBtn = doc.getElementById("run") || doc.querySelector("button, .run, #start, .start");
+          if (runBtn) {
+            // Trigger a real click as part of the user's original gesture
+            runBtn.click();
+
+            // Also attach touchstart fallback inside the iframe, in case it re-renders
+            runBtn.addEventListener("touchstart", () => runBtn.click(), { passive: true });
+          }
+          // Focus canvas if available (helps with keyboard on desktop)
+          const canvas = doc.querySelector("canvas");
+          canvas && canvas.focus && canvas.focus();
+        } catch (e) {
+          // Cross-origin or timing issue (shouldn't happen since same site), ignore silently
+          console.warn("Autostart hint:", e);
+        }
+      }, { once: true });
+
+      // Move the page to the game area (handy on phones)
+      gameArea.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    // Support both click and touchstart for the Play button
+    playBtn.addEventListener("click", startGame);
+    playBtn.addEventListener("touchstart", (e) => { e.preventDefault(); startGame(); }, { passive: false });
+  </script>
+</body>
+</html>
