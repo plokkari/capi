@@ -77,40 +77,54 @@ jobs:
 
       # Patch the generated game HTML:
       #  - Autostart (click typical run/start button)
-      #  - Hide top-left loading/status text and any overlay/badges
-      - name: Patch game HTML (autostart + hide corner/overlays)
+      #  - Hide top-left loading/status text
+      - name: Patch game HTML (autostart + hide status text)
         run: |
           python - <<'PY'
           import os, io
           p = "build/web/index.html"
           if os.path.isfile(p):
-              patch = r"""
+              patch_css = """
           <style>
-            /* Hide common top-left status/messages from pygbag/emscripten */
-            #output, .emscripten, .status, pre, .spinner, .emscripten_border {
-              display:none !important; visibility:hidden !important;
+            /* Hide only status text — keep canvas containers visible */
+            #output, #status, #spinner {
+              display: none !important;
+              visibility: hidden !important;
             }
-            /* Hide common top-right overlays/badges/toolbars */
-            #github-corner, .corner, .top-right, .badge, .toolbar, a[href*="github.com"]{
-              display:none !important; visibility:hidden !important;
+            /* Optional: hide little badges/links in corners */
+            #github-corner, .corner, .top-right, .badge, .toolbar,
+            a[href*="github.com"] {
+              display: none !important;
+              visibility: hidden !important;
             }
           </style>
+          """
+              patch_js = """
           <script>
           window.addEventListener("load", () => {
+            // Try clicking common "Run/Start" buttons if present
             const tryClick = () => {
-              const btn = document.getElementById("run") || document.querySelector(".run, #start, .start, button");
+              const btn = document.getElementById("run") ||
+                          document.querySelector(".run, #start, .start, button");
               try { if (btn) btn.click(); } catch(e){}
             };
-            // Attempt several times in case UI mounts late
             tryClick(); setTimeout(tryClick,150); setTimeout(tryClick,300);
-            // Also try sending SPACE/ENTER
-            const sendKey = (k)=>{document.dispatchEvent(new KeyboardEvent("keydown",{key:k,bubbles:true}));document.dispatchEvent(new KeyboardEvent("keyup",{key:k,bubbles:true}));};
+
+            // Also try Space / Enter to start some templates
+            const sendKey = (k)=>{
+              document.dispatchEvent(new KeyboardEvent("keydown",{key:k,bubbles:true}));
+              document.dispatchEvent(new KeyboardEvent("keyup",{key:k,bubbles:true}));
+            };
             setTimeout(()=>{ sendKey(" "); sendKey("Enter"); }, 350);
+
+            // Focus canvas if present
+            const canvas = document.querySelector("canvas");
+            if (canvas && canvas.focus) canvas.focus();
           });
           </script>
-              """
+          """
               with io.open(p, "a", encoding="utf-8") as f:
-                  f.write("\n"+patch+"\n")
+                  f.write("\n"+patch_css+"\n"+patch_js+"\n")
               print("Patched:", p)
           else:
               print("Skipping patch; file not found:", p)
@@ -147,4 +161,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
-
