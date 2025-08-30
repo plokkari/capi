@@ -126,7 +126,7 @@ jobs:
           # Ensure wrapper uses /game/index.html (update if your wrapper already exists)
           if [ -f "index.html" ]; then
             sed -i 's|build/web/index.html|game/index.html|g' index.html || true
-            sed -i 's|GAME_URL\s*=.*|const GAME_URL = "game/index.html";|g' index.html || true
+            sed -i 's|GAME_URL\s*=.*|const GAME_URL  = "game/index.html";|g' index.html || true
             cp index.html site/index.html
           else
             echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Flappy Capy 🐹</title></head><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#111;color:#fff"><iframe src="game/index.html" style="width:420px;height:640px;border:0;border-radius:12px;background:#000" allow="autoplay; fullscreen"></iframe></body></html>' > site/index.html
