@@ -2,17 +2,12 @@ name: Build & Deploy Flappy Capy
 
 on:
   push:
-    branches: [ main ]   # change to master if your default branch is master
+    branches: [ main ]
 
 permissions:
   contents: read
   pages: write
   id-token: write
-
-# Prevent overlapping deployments
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
 
 jobs:
   build:
@@ -53,13 +48,10 @@ jobs:
       - name: Ensure build dir exists
         run: mkdir -p build/web
 
-      # Start pygbag, wait for .wasm to appear, then stop server
       - name: Build with pygbag (timeout + wait for files)
         run: |
           set -e
           python -m pygbag main.py & PID=$!
-
-          # wait up to ~3 minutes for the web bundle to appear
           for i in $(seq 1 90); do
             if [ -f build/web/index.html ] && ls build/web/*.wasm >/dev/null 2>&1; then
               echo "✅ Web build detected."
@@ -68,83 +60,51 @@ jobs:
             echo "⏳ Waiting for build... ($i/90)"
             sleep 2
           done
-
-          # stop the background server if still running
           kill $PID || true
+          ls -la build/web
 
-          echo "Contents of build/web:"
-          ls -la build/web || (echo "❌ build/web missing" && exit 1)
-
-      # Patch the generated game HTML:
-      #  - Autostart (click typical run/start button)
-      #  - Hide top-left loading/status text
+      # Safe patch: hide only status text and overlays, not the canvas
       - name: Patch game HTML (autostart + hide status text)
         run: |
           python - <<'PY'
           import os, io
           p = "build/web/index.html"
           if os.path.isfile(p):
-              patch_css = """
+              patch = """
           <style>
-            /* Hide only status text — keep canvas containers visible */
+            /* Hide only status text — keep canvas visible */
             #output, #status, #spinner {
-              display: none !important;
-              visibility: hidden !important;
+              display:none !important; visibility:hidden !important;
             }
-            /* Optional: hide little badges/links in corners */
-            #github-corner, .corner, .top-right, .badge, .toolbar,
-            a[href*="github.com"] {
-              display: none !important;
-              visibility: hidden !important;
+            /* Hide top-right overlays/badges */
+            #github-corner, .corner, .top-right, .badge, .toolbar, a[href*="github.com"]{
+              display:none !important; visibility:hidden !important;
             }
           </style>
-          """
-              patch_js = """
           <script>
           window.addEventListener("load", () => {
-            // Try clicking common "Run/Start" buttons if present
-            const tryClick = () => {
-              const btn = document.getElementById("run") ||
-                          document.querySelector(".run, #start, .start, button");
+            const clickRun = () => {
+              const btn = document.getElementById("run") || document.querySelector(".run, #start, .start, button");
               try { if (btn) btn.click(); } catch(e){}
             };
-            tryClick(); setTimeout(tryClick,150); setTimeout(tryClick,300);
-
-            // Also try Space / Enter to start some templates
-            const sendKey = (k)=>{
-              document.dispatchEvent(new KeyboardEvent("keydown",{key:k,bubbles:true}));
-              document.dispatchEvent(new KeyboardEvent("keyup",{key:k,bubbles:true}));
-            };
-            setTimeout(()=>{ sendKey(" "); sendKey("Enter"); }, 350);
-
-            // Focus canvas if present
-            const canvas = document.querySelector("canvas");
-            if (canvas && canvas.focus) canvas.focus();
+            clickRun(); setTimeout(clickRun,150); setTimeout(clickRun,300);
           });
           </script>
-          """
+              """
               with io.open(p, "a", encoding="utf-8") as f:
-                  f.write("\n"+patch_css+"\n"+patch_js+"\n")
+                  f.write("\n"+patch+"\n")
               print("Patched:", p)
           else:
               print("Skipping patch; file not found:", p)
           PY
 
-      # Prepare a site/ folder with your wrapper at root and the game under /game
       - name: Prepare site folder
         run: |
-          set -e
           mkdir -p site/game
-          cp -r build/web/. site/game/
-
-          # Ensure wrapper uses /game/index.html (update if your wrapper already exists)
-          if [ -f "index.html" ]; then
-            sed -i 's|build/web/index.html|game/index.html|g' index.html || true
-            sed -i 's|GAME_URL\s*=.*|const GAME_URL  = "game/index.html";|g' index.html || true
-            cp index.html site/index.html
-          else
-            echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Flappy Capy 🐹</title></head><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#111;color:#fff"><iframe src="game/index.html" style="width:420px;height:640px;border:0;border-radius:12px;background:#000" allow="autoplay; fullscreen"></iframe></body></html>' > site/index.html
-          fi
+          cp -r build/web/* site/game/
+          # Ensure wrapper uses /game/index.html
+          sed -i 's|build/web/index.html|game/index.html|g' index.html || true
+          cp index.html site/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
