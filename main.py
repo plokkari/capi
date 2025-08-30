@@ -118,7 +118,10 @@ def check_collision_single_column():
     return True
 
 SPAWNPIPE = pygame.USEREVENT
-pygame.time.set_timer(SPAWNPIPE, 1200)
+
+# ---- TINY EASING CHANGE: spawn a bit less frequently (side-to-side spacing) ----
+SPAWN_INTERVAL_MS = 1300  # was 1200 (≈ +8% more horizontal spacing)
+pygame.time.set_timer(SPAWNPIPE, SPAWN_INTERVAL_MS)
 
 # =========================
 #  UI HELPERS
