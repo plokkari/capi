@@ -31,7 +31,7 @@ jobs:
         with:
           version: latest
 
-      # 👇 Force pygbag to build for the web (not APK)
+      # Force pygbag to build for web (not APK) & avoid config parser issue
       - name: Create pygbag.ini
         run: |
           cat > pygbag.ini <<'EOF'
@@ -47,25 +47,31 @@ jobs:
           ignoredirs  =
           EOF
 
+      # PRE-CREATE the output dir so zipfile/pack doesn't fail
+      - name: Ensure build dir exists
+        run: mkdir -p build/web
+
       - name: Build with pygbag
         run: |
           python -m pygbag main.py
-          ls -la build/web
+          ls -la build/web || true
 
       # Optional: auto-start patch to skip green overlay on mobile
       - name: Auto-start patch (skip green overlay)
         run: |
-          cat >> build/web/index.html <<'PATCH'
-          <script>
-          window.addEventListener("load", () => {
-            const clickRun = () => {
-              const btn = document.getElementById("run") || document.querySelector(".run, #start, .start, button");
-              if (btn) try { btn.click(); } catch(e) {}
-            };
-            clickRun(); setTimeout(clickRun, 150); setTimeout(clickRun, 300);
-          });
-          </script>
-          PATCH
+          if [ -f build/web/index.html ]; then
+            cat >> build/web/index.html <<'PATCH'
+            <script>
+            window.addEventListener("load", () => {
+              const clickRun = () => {
+                const btn = document.getElementById("run") || document.querySelector(".run, #start, .start, button");
+                if (btn) try { btn.click(); } catch(e) {}
+              };
+              clickRun(); setTimeout(clickRun, 150); setTimeout(clickRun, 300);
+            });
+            </script>
+            PATCH
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
