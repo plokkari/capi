@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flappy Capy 🐹</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(180deg, #1a1a2e, #16213e);
+      color: #fff;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; gap: 20px; padding: 16px;
+    }
+    h1 { margin: 0; font-size: 2rem; text-align: center; }
+    p { opacity: 0.9; text-align: center; margin: 0; }
+    .btn {
+      padding: 14px 24px; font-size: 1rem; font-weight: bold;
+      background: #e94560; color: #fff; border: none; border-radius: 10px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .game-area { width: 100%; max-width: 420px; display: none; flex-direction: column; gap: 8px; }
+    .game-frame { width: 100%; height: 640px; border: 0; border-radius: 10px; background: #000; }
+    footer { margin-top: 16px; opacity: 0.6; font-size: .9rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Flappy Capy 🐹</h1>
+  <p>Guide the business Capybara through the obstacles and earn your airdrops!</p>
+
+  <button id="play" class="btn">▶ Play Game</button>
+
+  <div id="gameArea" class="game-area">
+    <iframe id="gameFrame" class="game-frame" allow="autoplay; fullscreen"></iframe>
+    <small>Tip: tap anywhere inside the game to flap.</small>
+  </div>
+
+  <footer>Made with ❤️ for the CapyCoin community</footer>
+
+  <script>
+    const GAME_URL  = "game/index.html";
+    const playBtn   = document.getElementById("play");
+    const gameArea  = document.getElementById("gameArea");
+    const gameFrame = document.getElementById("gameFrame");
+
+    function sendKey(doc, key) {
+      const opts = {bubbles:true, cancelable:true, key, code:key, which:key === " " ? 32 : 13, keyCode:key === " " ? 32 : 13};
+      doc.dispatchEvent(new KeyboardEvent("keydown", opts));
+      doc.dispatchEvent(new KeyboardEvent("keyup",   opts));
+    }
+
+    function synthClickAt(doc, x, y) {
+      const el = doc.elementFromPoint(x, y) || doc.body;
+      if (!el) return;
+      const evOpts = {bubbles:true, cancelable:true, clientX:x, clientY:y};
+      el.dispatchEvent(new MouseEvent("pointerdown", evOpts));
+      el.dispatchEvent(new MouseEvent("mousedown",    evOpts));
+      el.dispatchEvent(new MouseEvent("click",        evOpts));
+      el.dispatchEvent(new MouseEvent("mouseup",      evOpts));
+      el.dispatchEvent(new MouseEvent("pointerup",    evOpts));
+    }
+
+    function injectCSS(doc, css) {
+      const st = doc.createElement("style");
+      st.textContent = css;
+      (doc.head || doc.documentElement).appendChild(st);
+    }
+
+    function tryAutostart(doc) {
+      try {
+        // 1) Click the typical run/start button
+        const runBtn = doc.getElementById("run") || doc.querySelector(".run, #start, .start, button");
+        if (runBtn) runBtn.click();
+
+        // 2) Kill splash/overlay hitboxes just in case they block taps
+        injectCSS(doc, `
+          .splash, #splash, .overlay, #overlay, .cover, #cover, .modal, [role="dialog"] {
+            pointer-events: none !important; opacity: 0 !important;
+          }
+          #run { position: relative !important; z-index: 9999 !important; }
+        `);
+
+        // 3) Try several synthetic clicks near the very top (where your device registers it)
+        const clickTop = () => {
+          // try a few x positions across the top strip
+          const W = doc.documentElement.clientWidth || 320;
+          const xs = [10, Math.floor(W/4), Math.floor(W/2), Math.floor(3*W/4), W-10];
+          const ys = [6, 12, 20, 28]; // tiny top band
+          ys.forEach(y => xs.forEach(x => synthClickAt(doc, x, y)));
+        };
+
+        // 4) Also try Space / Enter (some templates bind these)
+        const pressKeys = () => { sendKey(doc, " "); sendKey(doc, "Enter"); };
+
+        // Run sequence a few times to catch late-mounted elements
+        clickTop(); pressKeys();
+        setTimeout(clickTop,   120);
+        setTimeout(pressKeys,  140);
+        setTimeout(clickTop,   260);
+        setTimeout(pressKeys,  280);
+
+        // Focus canvas if present
+        const canvas = doc.querySelector("canvas");
+        if (canvas && canvas.focus) canvas.focus();
+      } catch (e) {
+        console.warn("Autostart sequence error:", e);
+      }
+    }
+
+    function startGame() {
+      gameArea.style.display = "flex";
+      if (!gameFrame.src.endsWith(GAME_URL)) gameFrame.src = GAME_URL;
+
+      gameFrame.addEventListener("load", () => {
+        const doc = gameFrame.contentDocument || gameFrame.contentWindow.document;
+        // Try immediately, then again shortly after in case template mounts late
+        tryAutostart(doc);
+        setTimeout(() => tryAutostart(doc), 300);
+        setTimeout(() => tryAutostart(doc), 600);
+      }, { once: true });
+
+      gameArea.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    playBtn.addEventListener("click", startGame);
+    playBtn.addEventListener("touchstart", (e) => { e.preventDefault(); startGame(); }, { passive: false });
+  </script>
+</body>
+</html>
