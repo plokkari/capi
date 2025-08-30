@@ -63,8 +63,8 @@ jobs:
           kill $PID || true
           ls -la build/web
 
-      # Optional: hide pygbag corner/overlay & auto-start inside the game
-      - name: Patch game HTML (autostart + hide corner)
+      # Safe patch: hide only status text and overlays, not the canvas
+      - name: Patch game HTML (autostart + hide status text)
         run: |
           python - <<'PY'
           import os, io
@@ -72,7 +72,11 @@ jobs:
           if os.path.isfile(p):
               patch = """
           <style>
-            /* hide common top-right overlays/badges that pygbag/emscripten templates add */
+            /* Hide only status text — keep canvas visible */
+            #output, #status, #spinner {
+              display:none !important; visibility:hidden !important;
+            }
+            /* Hide top-right overlays/badges */
             #github-corner, .corner, .top-right, .badge, .toolbar, a[href*="github.com"]{
               display:none !important; visibility:hidden !important;
             }
@@ -88,13 +92,12 @@ jobs:
           </script>
               """
               with io.open(p, "a", encoding="utf-8") as f:
-                  f.write("\\n"+patch+"\\n")
+                  f.write("\n"+patch+"\n")
               print("Patched:", p)
           else:
               print("Skipping patch; file not found:", p)
           PY
 
-      # Prepare a site/ folder with wrapper at root and game under /game
       - name: Prepare site folder
         run: |
           mkdir -p site/game
