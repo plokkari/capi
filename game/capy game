@@ -23,7 +23,7 @@ high_score = 0.0
 
 # =========================
 #  ASSETS
-# =========================
+# =========================$
 # Background
 background_img = pygame.image.load("capy back.png").convert()
 background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
