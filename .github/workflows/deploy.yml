@@ -121,7 +121,7 @@ jobs:
         run: |
           set -e
           mkdir -p site/game
-          cp -r build/web/* site/game/
+          cp -r build/web/. site/game/
 
           # Ensure wrapper uses /game/index.html (update if your wrapper already exists)
           if [ -f "index.html" ]; then
