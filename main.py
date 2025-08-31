@@ -70,7 +70,7 @@ def _first_existing_sound(basename, exts):
 
 # Load sounds (do NOT autoplay the music yet)
 if SOUND_ENABLED:
-    # On web prefer .wav/.ogg (pygbag forbids mp3/m4a). Desktop can try mp3/m4a too.
+    # On web prefer .wav/.ogg. Desktop can try mp3/m4a too.
     music_path  = _first_existing_sound("flappy_capy_smooth_loop",
                                         (".wav", ".ogg") if IS_WEB else (".ogg", ".wav", ".mp3", ".m4a"))
     reward_path = _first_existing_sound("reward_ding",
@@ -80,11 +80,9 @@ if SOUND_ENABLED:
 
     try:
         if IS_WEB:
-            # Use Sound on a dedicated channel for background loop
             if music_path:
                 MUSIC_BG = pygame.mixer.Sound(music_path)
         else:
-            # Desktop: stream via mixer.music
             if music_path:
                 pygame.mixer.music.load(music_path)
                 pygame.mixer.music.set_volume(MUSIC_VOLUME)
@@ -154,8 +152,12 @@ CLOCK = pygame.time.Clock()
 FONT = pygame.font.SysFont("Arial", 32)
 
 # --- Game variables ---
-gravity = 0.5
-capy_movement = 0
+# Time-based physics (device independent)
+GRAVITY = 1800.0        # pixels / s^2   (~0.5 per frame at 60 FPS)
+FLAP_VELOCITY = -600.0  # pixels / s     (~-10 per frame at 60 FPS)
+capy_movement = 0.0     # velocity (px/s)
+capy_y = float(HEIGHT // 2)  # precise vertical position as float
+
 game_state = "start"
 score = 0
 high_score = 0
@@ -171,7 +173,7 @@ def try_flap():
     global capy_movement, last_flap_time
     t = time.perf_counter()
     if t - last_flap_time >= MIN_FLAP_INTERVAL:
-        capy_movement = -10
+        capy_movement = FLAP_VELOCITY
         last_flap_time = t
 
 # =========================
@@ -191,7 +193,7 @@ capy_rect.center = (100, HEIGHT // 2)
 OBSTACLE_WIDTH = 60
 SCROLL_SPEED   = 150
 SPAWN_OFFSET_X = WIDTH + 60
-OBSTACLE_SPACING_X = 130
+OBSTACLE_SPACING_X = 140   # phone-friendly spacing (was 130)
 SPACING_JITTER = 15
 SPAWN_EDGE_GUARD = 40
 
@@ -276,10 +278,26 @@ def check_collision_single_column():
 # =========================
 def next_challenge_increment(): return random.randint(5, 5)
 next_challenge_at = next_challenge_increment()
-challenge = {"code":"","typed":"","deadline":0.0,"active":False,"time_limit":9.5}
+
+# Bot-hardening config
+MIN_CHAR_INTERVAL = 0.12      # 120 ms between chars
+MAX_STRIKES = 3               # wrong 4-char tries allowed
+last_char_time = 0.0
+
+challenge = {
+    "code": "",
+    "typed": "",
+    "deadline": 0.0,
+    "active": False,
+    "time_limit": 15.0,   # 15 seconds
+    "strikes": 0
+}
 
 # Input rect for mobile keyboards (matches the overlay box)
 CHALLENGE_INPUT_RECT = pygame.Rect(WIDTH//2 - 130, HEIGHT//2 - 40, 260, 80)
+
+# Allowed character set (matches code generation)
+ALLOWED_CHARS = [d for d in "23456789"] + [c for c in string.ascii_uppercase if c not in ("O","I")]
 
 def random_code(n=4):
     alphabet = [c for c in string.ascii_uppercase if c not in ("O","I")]
@@ -288,12 +306,15 @@ def random_code(n=4):
     return "".join(random.choice(pool) for _ in range(n))
 
 def start_challenge():
-    global game_state, challenge, spawning_enabled
+    global game_state, challenge, spawning_enabled, keyboard_mode
     spawning_enabled = False
     challenge["code"] = random_code(4)
     challenge["typed"] = ""
     challenge["deadline"] = time.perf_counter() + challenge["time_limit"]
     challenge["active"] = True
+    challenge["strikes"] = 0
+    keyboard_mode = "letters"  # start on letters
+
     game_state = "challenge"
     # Mobile keyboards: start text input and anchor to the code box
     try:
@@ -302,62 +323,159 @@ def start_challenge():
     except Exception:
         pass
 
-# =============== On-screen keypad for mobile (challenge) ===============
-ALLOWED_CHARS = [d for d in "23456789"] + [c for c in string.ascii_uppercase if c not in ("O","I")]
-KEYS_PER_ROW = 8
-KEYPAD_KEYS = ALLOWED_CHARS[:]  # 32 keys (8x4)
-KEYPAD_KEYS.append("←")         # Backspace key at the end
+# =============== Phone-style on-screen keyboard ===============
+keyboard_mode = "letters"  # or 'numbers'
 
-def get_keypad_layout():
-    """Return list of (label, rect) for keypad buttons."""
-    # Place keypad in lower 45% of the screen
+def _keyboard_rows_letters():
+    # iOS-like three rows + bottom row with 123 and backspace
+    rows = [
+        list("QWERTYUIOP"),
+        list("ASDFGHJKL"),
+        list("ZXCVBNM")
+    ]
+    # Show I and O but disable them (not allowed in codes)
+    disabled = set(["I","O"])
+    return rows, disabled
+
+def _keyboard_rows_numbers():
+    # Only digits 2..9 (0 and 1 are not used in codes)
+    rows = [
+        list("2345"),
+        list("6789")
+    ]
+    disabled = set()  # all shown numbers are valid
+    return rows, disabled
+
+def get_keyboard_layout():
+    """
+    Build phone-like keyboard geometry.
+    Returns list of (label, rect, enabled, kind)
+    kind in {"char","backspace","toggle","spacer"}
+    """
     pad = 6
-    rows = []
-    total_rows = (len(KEYPAD_KEYS) + KEYS_PER_ROW - 1) // KEYS_PER_ROW
-    # Ensure at least 3 rows visible nicely; clamp height
+    keyspec = []
+
+    # available area for the keyboard (bottom ~45% of screen)
     avail_top = int(HEIGHT * 0.55)
     avail_bottom = HEIGHT - 10
-    avail_h = max(120, avail_bottom - avail_top)
+
+    # Build logical rows
+    if keyboard_mode == "letters":
+        rows, disabled = _keyboard_rows_letters()
+        bottom = [["123"], [" "], ["←"]]  # spacer in middle
+        special_left, special_right = "toggle", "backspace"
+    else:
+        rows, disabled = _keyboard_rows_numbers()
+        bottom = [["ABC"], [" "], ["←"]]
+        special_left, special_right = "toggle", "backspace"
+
+    # Combine rows with bottom bar
+    all_rows = rows + bottom
+
+    # Compute geometry
+    total_rows = len(all_rows)
+    avail_h = max(140, avail_bottom - avail_top)
     key_h = (avail_h - (total_rows + 1) * pad) // total_rows
-    key_w = (WIDTH - (KEYS_PER_ROW + 1) * pad) // KEYS_PER_ROW
+
     y = avail_top + pad
-    idx = 0
     layout = []
-    for r in range(total_rows):
+    for r, row in enumerate(all_rows):
+        # Center shorter rows (like ASDF.. and ZXCV..)
+        nkeys = len(row)
+        # Make bottom bar have three equally sized "keys"
+        if r == total_rows - 1:  # bottom bar
+            nkeys = 3
+            row = row  # already ["123"/"ABC"], [" "], ["←"]
+        key_w = (WIDTH - (nkeys + 1) * pad) // nkeys
         x = pad
-        for c in range(KEYS_PER_ROW):
-            if idx >= len(KEYPAD_KEYS):
-                break
+        for i, label in enumerate(row):
             rect = pygame.Rect(x, y, key_w, key_h)
-            layout.append((KEYPAD_KEYS[idx], rect))
+            if r == total_rows - 1:
+                # bottom row kinds
+                if i == 0:
+                    kind = "toggle"
+                    enabled = True
+                elif i == 2:
+                    kind = "backspace"
+                    enabled = True
+                else:
+                    kind = "spacer"
+                    enabled = False
+            else:
+                kind = "char"
+                # Enabled if allowed char set; I and O appear disabled on letters; all numbers shown are allowed
+                enabled = (label in ALLOWED_CHARS) and (label not in disabled)
+                # For letters mode, label might be I/O which is NOT in ALLOWED_CHARS; keep as disabled
+                if keyboard_mode == "letters" and label in ("I","O"):
+                    enabled = False
+            layout.append((label, rect, enabled, kind))
             x += key_w + pad
-            idx += 1
         y += key_h + pad
+
     return layout
 
-def draw_keypad():
-    """Draw keypad; called only during challenge."""
-    keys = get_keypad_layout()
-    for label, rect in keys:
-        pygame.draw.rect(SCREEN, (25, 25, 25), rect, border_radius=8)
-        pygame.draw.rect(SCREEN, (210, 210, 210), rect, width=2, border_radius=8)
-        txt = FONT.render(label, True, (240,240,240))
+def draw_keyboard():
+    keys = get_keyboard_layout()
+    for label, rect, enabled, kind in keys:
+        # style
+        bg = (25,25,25) if enabled or kind in ("backspace","toggle") else (15,15,15)
+        border = (210,210,210) if enabled or kind in ("backspace","toggle") else (90,90,90)
+        pygame.draw.rect(SCREEN, bg, rect, border_radius=8)
+        pygame.draw.rect(SCREEN, border, rect, width=2, border_radius=8)
+
+        if kind == "spacer":
+            continue
+
+        txt_label = label
+        if kind == "toggle":
+            txt_label = "123" if keyboard_mode == "letters" else "ABC"
+        elif kind == "backspace":
+            txt_label = "←"
+
+        color = (240,240,240) if (enabled or kind in ("backspace","toggle")) else (120,120,120)
+        txt = FONT.render(txt_label, True, color)
         SCREEN.blit(txt, (rect.centerx - txt.get_width()//2, rect.centery - txt.get_height()//2))
 
-def handle_keypad_click(pos):
-    """Process taps on keypad; returns True if it handled a key."""
-    if game_state != "challenge":
-        return False
-    for label, rect in get_keypad_layout():
+def handle_keyboard_click(pos):
+    global keyboard_mode, last_char_time
+    keys = get_keyboard_layout()
+    for label, rect, enabled, kind in keys:
         if rect.collidepoint(pos):
-            if label == "←":
+            if kind == "toggle":
+                keyboard_mode = "numbers" if keyboard_mode == "letters" else "letters"
+                return True
+            if kind == "backspace":
                 if challenge["typed"]:
                     challenge["typed"] = challenge["typed"][:-1]
-            else:
-                if len(challenge["typed"]) < 4 and label in ALLOWED_CHARS:
-                    challenge["typed"] = challenge["typed"] + label
+                return True
+            if kind == "char" and enabled and len(challenge["typed"]) < 4:
+                t = time.perf_counter()
+                if (t - last_char_time) >= MIN_CHAR_INTERVAL:
+                    challenge["typed"] += label
+                    last_char_time = t
+                return True
             return True
     return False
+
+# --- Slight anti-OCR distortion for the code text (deterministic) ---
+def draw_distorted_code(code, y, color=(255,255,255)):
+    rng = random.Random(code)  # deterministic per challenge
+    glyphs = []
+    spacing = 6
+    total_w = 0
+    for ch in code:
+        surf = FONT.render(ch, True, color)
+        angle = rng.uniform(-6, 6)   # small rotation
+        rotated = pygame.transform.rotate(surf, angle)
+        # tiny x jitter to break perfect alignment
+        offset_x = rng.randint(-1, 1)
+        glyphs.append((rotated, offset_x))
+        total_w += rotated.get_width() + spacing
+    total_w -= spacing
+    x = WIDTH//2 - total_w//2
+    for rotated, dx in glyphs:
+        SCREEN.blit(rotated, (x + dx, y))
+        x += rotated.get_width() + spacing
 
 # =========================
 #  UI HELPERS
@@ -378,9 +496,10 @@ def score_display(mode):
         SCREEN.blit(hs, (WIDTH//2 - hs.get_width()//2, HEIGHT//2))
 
 def reset_game():
-    global capy_movement, score, obstacles, next_challenge_at, challenge, spawning_enabled, next_spacing_x, played_gameover_sound
+    global capy_movement, capy_y, score, obstacles, next_challenge_at, challenge, spawning_enabled, next_spacing_x, played_gameover_sound
     capy_rect.center = (100, HEIGHT // 2)
-    capy_movement = 0
+    capy_y = float(HEIGHT // 2)
+    capy_movement = 0.0
     obstacles = []
     score = 0
     next_challenge_at = next_challenge_increment()
@@ -388,15 +507,18 @@ def reset_game():
     challenge["typed"] = ""
     challenge["code"] = ""
     challenge["deadline"] = 0.0
+    challenge["strikes"] = 0
     spawning_enabled = False
     next_spacing_x = OBSTACLE_SPACING_X + random.randint(-SPACING_JITTER, SPACING_JITTER)
     played_gameover_sound = False
     _apply_mute_state()
 
 def enter_play():
-    global game_state, spawning_enabled, next_spacing_x
+    global game_state, spawning_enabled, next_spacing_x, capy_y
     game_state = "play"; spawning_enabled = True
     next_spacing_x = OBSTACLE_SPACING_X + random.randint(-SPACING_JITTER, SPACING_JITTER)
+    # Sync float position to current sprite position to avoid a jump
+    capy_y = float(capy_rect.centery)
 
 def draw_challenge_overlay():
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -408,17 +530,17 @@ def draw_challenge_overlay():
     box_rect = pygame.Rect(WIDTH//2 - box_w//2, HEIGHT//2 - box_h//2, box_w, box_h)
     pygame.draw.rect(SCREEN, (30,30,30), box_rect, border_radius=10)
     pygame.draw.rect(SCREEN, (200,180,90), box_rect, width=3, border_radius=10)
-    code_surf = FONT.render(code, True, (255,255,255))
-    SCREEN.blit(code_surf, (WIDTH//2 - code_surf.get_width()//2, box_rect.y+8))
+    # Distorted code (anti-OCR) — centered
+    draw_distorted_code(code, box_rect.y + 8, (255,255,255))
     typed_font = pygame.font.SysFont("Arial", 26)
-    typed_surf = pygame.font.SysFont("Arial", 26).render(typed or " ", True, (180,220,255))
+    typed_surf = typed_font.render(typed or " ", True, (180,220,255))
     SCREEN.blit(typed_surf, (WIDTH//2 - typed_surf.get_width()//2, box_rect.y+46))
     remaining = max(0.0, challenge["deadline"] - time.perf_counter())
     timer_font = pygame.font.SysFont("Arial", 20)
     timer_surf = timer_font.render(f"{remaining:.1f}s", True, (255,200,200) if remaining<3 else (200,255,200))
     SCREEN.blit(timer_surf, (WIDTH//2 - timer_surf.get_width()//2, int(HEIGHT*0.72)))
-    # On-screen keypad (mobile-friendly)
-    draw_keypad()
+    # On-screen keyboard (mobile-friendly)
+    draw_keyboard()
 
 # =========================
 #  MAIN LOOP
@@ -429,7 +551,8 @@ while True:
     now = time.perf_counter()
     dt = now - last_time
     last_time = now
-    dt = max(0.0, min(dt, 0.030))
+    # Cap only big pauses (tab switches), not normal low FPS
+    dt = max(0.0, min(dt, 0.10))
     game_active = (game_state == "play")
     paused_for_focus = game_active and (not pygame.display.get_active())
 
@@ -468,7 +591,8 @@ while True:
             elif game_state == "challenge":
                 # BACKSPACE still arrives as KEYDOWN on soft keyboards / desktop
                 if event.key == pygame.K_BACKSPACE:
-                    challenge["typed"] = challenge["typed"][:-1]
+                    if challenge["typed"]:
+                        challenge["typed"] = challenge["typed"][:-1]
 
             elif game_state == "gameover":
                 if time.time() - gameover_time > 1 and event.key == pygame.K_r:
@@ -477,19 +601,21 @@ while True:
         # TEXTINPUT: soft keyboard characters for mobile / desktop IME
         if event.type == pygame.TEXTINPUT and game_state == "challenge":
             ch = event.text.upper()
-            if ch and ch.isalnum() and ch not in ["O","I"]:
-                if len(challenge["typed"]) < 4:
+            t = time.perf_counter()
+            if ch in ALLOWED_CHARS:
+                if (t - last_char_time) >= MIN_CHAR_INTERVAL and len(challenge["typed"]) < 4:
                     challenge["typed"] = (challenge["typed"] + ch)
+                    last_char_time = t
             continue
 
         # Normal gameplay click handling (after consuming mute click above)
         if event.type == pygame.MOUSEBUTTONDOWN:
-            # If user taps the challenge text box, re-focus text input on mobile
             if game_state == "challenge":
-                # On-screen keypad tap?
-                if handle_keypad_click(event.pos):
+                # On-screen phone keyboard tap?
+                if handle_keyboard_click(event.pos):
                     maybe_start_music()  # harmless
                     continue
+                # If user taps the code box, re-focus text input on mobile
                 if CHALLENGE_INPUT_RECT.collidepoint(event.pos):
                     try:
                         pygame.key.set_text_input_rect(CHALLENGE_INPUT_RECT)
@@ -526,14 +652,18 @@ while True:
         score_display("main")
 
     elif game_state == "play" and not paused_for_focus:
-        capy_movement += gravity
-        capy_rect.centery += capy_movement
-        capy_angle = -capy_movement * 3
+        # time-based physics
+        capy_movement += GRAVITY * dt                # v += a*dt
+        capy_y += capy_movement * dt                 # y += v*dt
+        capy_rect.centery = int(capy_y)              # assign int to Rect
+        capy_angle = -capy_movement * 0.05           # degrees; tuned to feel like before
         capy_rotated = pygame.transform.rotate(capy_img, capy_angle)
         SCREEN.blit(capy_rotated, capy_rotated.get_rect(center=capy_rect.center))
+
         obstacles[:] = update_obstacles(dt)
         maybe_spawn_by_distance()
         draw_obstacles()
+
         if not check_collision_single_column():
             game_state = "gameover"; gameover_time = time.time(); spawning_enabled = False
             if SOUND_ENABLED and (not is_muted) and SFX_GAMEOVER:
@@ -541,12 +671,14 @@ while True:
                     try: SFX_GAMEOVER.play()
                     except: pass
                     played_gameover_sound = True
+
         for ob in obstacles:
             if (not ob["scored"]) and (ob["x"]+OBSTACLE_WIDTH) < capy_rect.left:
                 score += 1; ob["scored"] = True
                 if SOUND_ENABLED and (not is_muted) and SFX_REWARD:
                     try: SFX_REWARD.play()
                     except: pass
+
         if score >= next_challenge_at: start_challenge()
         score_display("main")
 
@@ -556,34 +688,36 @@ while True:
         draw_text_center("Paused (click tab to return)", 20, int(HEIGHT*0.15), (200,200,200))
 
     elif game_state == "challenge":
+        # Wrong full entry -> strike
+        if len(challenge["typed"]) == 4 and challenge["typed"] != challenge["code"]:
+            challenge["strikes"] += 1
+            challenge["typed"] = ""
+
         draw_obstacles()
         SCREEN.blit(capy_img, capy_img.get_rect(center=capy_rect.center))
         score_display("main")
         draw_challenge_overlay()
 
+        # Success
         if challenge["typed"] == challenge["code"]:
-            # Passed: clear course and go to READY
-            try:
-                pygame.key.stop_text_input()
-            except Exception:
-                pass
+            try: pygame.key.stop_text_input()
+            except Exception: pass
             challenge["active"] = False
             game_state = "ready"
             challenge["typed"] = ""
             challenge["code"] = ""
             challenge["deadline"] = 0.0
+            challenge["strikes"] = 0
             obstacles.clear()
-            capy_movement = 0
+            capy_movement = 0.0
             next_spacing_x = OBSTACLE_SPACING_X + random.randint(-SPACING_JITTER, SPACING_JITTER)
             next_challenge_at = score + next_challenge_increment()
             spawning_enabled = False
 
-        elif time.perf_counter() > challenge["deadline"]:
-            # Failed challenge -> game over
-            try:
-                pygame.key.stop_text_input()
-            except Exception:
-                pass
+        # Out of time or too many strikes -> game over
+        elif time.perf_counter() > challenge["deadline"] or challenge["strikes"] >= MAX_STRIKES:
+            try: pygame.key.stop_text_input()
+            except Exception: pass
             game_state = "gameover"
             gameover_time = time.time()
             spawning_enabled = False
