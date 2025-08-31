@@ -68,15 +68,23 @@ def _first_existing_sound(basename, exts):
             return p
     return None
 
-# Load sounds (do NOT autoplay the music yet)
-if SOUND_ENABLED:
-    # On web prefer .wav/.ogg. Desktop can try mp3/m4a too.
-    music_path  = _first_existing_sound("flappy_capy_smooth_loop",
-                                        (".wav", ".ogg") if IS_WEB else (".ogg", ".wav", ".mp3", ".m4a"))
-    reward_path = _first_existing_sound("reward_ding",
-                                        (".wav", ".ogg") if IS_WEB else (".ogg", ".wav", ".mp3", ".m4a"))
-    over_path   = _first_existing_sound("game_over_wah",
-                                        (".wav", ".ogg") if IS_WEB else (".ogg", ".wav", ".mp3", ".m4a"))
+def load_audio_assets():
+    """(Re)load all audio assets after mixer init. Keeps globals up to date."""
+    global MUSIC_BG, SFX_REWARD, SFX_GAMEOVER
+    MUSIC_BG = None
+    SFX_REWARD = None
+    SFX_GAMEOVER = None
+    if not SOUND_ENABLED:
+        return
+
+    # Prefer WAV on web/iOS, fall back to OGG; desktop can also try mp3/m4a
+    exts_web     = (".wav", ".ogg")
+    exts_desktop = (".ogg", ".wav", ".mp3", ".m4a")
+    preferred = exts_web if IS_WEB else exts_desktop
+
+    music_path  = _first_existing_sound("flappy_capy_smooth_loop", preferred)
+    reward_path = _first_existing_sound("reward_ding",             preferred)
+    over_path   = _first_existing_sound("game_over_wah",           preferred)
 
     try:
         if IS_WEB:
@@ -91,28 +99,30 @@ if SOUND_ENABLED:
 
     try:
         if reward_path:
-            SFX_REWARD = pygame.mixer.Sound(reward_path)
-            SFX_REWARD.set_volume(SFX_VOLUME)
+            SFX_REWARD = pygame.mixer.Sound(reward_path);  SFX_REWARD.set_volume(SFX_VOLUME)
         if over_path:
-            SFX_GAMEOVER = pygame.mixer.Sound(over_path)
-            SFX_GAMEOVER.set_volume(SFX_VOLUME)
+            SFX_GAMEOVER = pygame.mixer.Sound(over_path);  SFX_GAMEOVER.set_volume(SFX_VOLUME)
     except Exception:
-        SFX_REWARD = SFX_REWARD or None
-        SFX_GAMEOVER = SFX_GAMEOVER or None
-else:
-    MUSIC_BG = None
-    SFX_REWARD = None
-    SFX_GAMEOVER = None
+        pass
 
-def maybe_start_music():
-    """Start looping music after a user gesture (required on iOS)."""
-    global MUSIC_STARTED, MUSIC_CHANNEL
-    if not SOUND_ENABLED or MUSIC_STARTED:
+def hard_resume_audio():
+    """Re-init mixer AFTER a user gesture, then reload assets and start music."""
+    global SOUND_ENABLED, MUSIC_STARTED, MUSIC_CHANNEL
+    try:
+        pygame.mixer.quit()
+        pygame.mixer.pre_init(44100, -16, 2, 512)
+        pygame.mixer.init()
+        SOUND_ENABLED = True
+    except Exception:
+        SOUND_ENABLED = False
         return
+
+    load_audio_assets()
+    MUSIC_STARTED = False
+    # start music immediately (we're inside a gesture)
     try:
         if IS_WEB:
             if MUSIC_BG is not None:
-                # Reserve channel 0 for background music
                 if MUSIC_CHANNEL is None:
                     pygame.mixer.set_num_channels(max(8, pygame.mixer.get_num_channels()))
                     MUSIC_CHANNEL = pygame.mixer.Channel(0)
@@ -120,10 +130,38 @@ def maybe_start_music():
                 MUSIC_CHANNEL.set_volume(0.0 if is_muted else MUSIC_VOLUME)
         else:
             pygame.mixer.music.play(-1)
-            _apply_mute_state()
         MUSIC_STARTED = True
+        _apply_mute_state()
     except Exception:
         pass
+
+def maybe_start_music():
+    """Start looping music after a user gesture (needed on iOS)."""
+    global MUSIC_STARTED, MUSIC_CHANNEL
+    if MUSIC_STARTED:
+        return
+    # Try normal start first
+    try:
+        if IS_WEB:
+            if MUSIC_BG is not None:
+                if MUSIC_CHANNEL is None:
+                    pygame.mixer.set_num_channels(max(8, pygame.mixer.get_num_channels()))
+                    MUSIC_CHANNEL = pygame.mixer.Channel(0)
+                MUSIC_CHANNEL.play(MUSIC_BG, loops=-1)
+                MUSIC_CHANNEL.set_volume(0.0 if is_muted else MUSIC_VOLUME)
+                MUSIC_STARTED = True
+        else:
+            pygame.mixer.music.play(-1)
+            MUSIC_STARTED = True
+        _apply_mute_state()
+        return
+    except Exception:
+        pass
+    # If that didn’t work (suspended context), do a hard mixer re-init now
+    hard_resume_audio()
+
+# Load sounds once at boot (will be reloaded by hard_resume_audio on iOS if needed)
+load_audio_assets()
 
 MUTE_BTN_SIZE = 36
 mute_button_rect = pygame.Rect(WIDTH - MUTE_BTN_SIZE - 10, 10, MUTE_BTN_SIZE, MUTE_BTN_SIZE)
@@ -353,8 +391,6 @@ def get_keyboard_layout():
     kind in {"char","backspace","toggle","spacer"}
     """
     pad = 6
-    keyspec = []
-
     # available area for the keyboard (bottom ~45% of screen)
     avail_top = int(HEIGHT * 0.55)
     avail_bottom = HEIGHT - 10
@@ -363,11 +399,9 @@ def get_keyboard_layout():
     if keyboard_mode == "letters":
         rows, disabled = _keyboard_rows_letters()
         bottom = [["123"], [" "], ["←"]]  # spacer in middle
-        special_left, special_right = "toggle", "backspace"
     else:
         rows, disabled = _keyboard_rows_numbers()
         bottom = [["ABC"], [" "], ["←"]]
-        special_left, special_right = "toggle", "backspace"
 
     # Combine rows with bottom bar
     all_rows = rows + bottom
@@ -380,36 +414,33 @@ def get_keyboard_layout():
     y = avail_top + pad
     layout = []
     for r, row in enumerate(all_rows):
-        # Center shorter rows (like ASDF.. and ZXCV..)
-        nkeys = len(row)
-        # Make bottom bar have three equally sized "keys"
-        if r == total_rows - 1:  # bottom bar
+        # bottom row: three equal slots (toggle, spacer, backspace)
+        if r == total_rows - 1:
             nkeys = 3
-            row = row  # already ["123"/"ABC"], [" "], ["←"]
-        key_w = (WIDTH - (nkeys + 1) * pad) // nkeys
-        x = pad
-        for i, label in enumerate(row):
+            key_w = (WIDTH - (nkeys + 1) * pad) // nkeys
+            x = pad
+            # left = toggle
             rect = pygame.Rect(x, y, key_w, key_h)
-            if r == total_rows - 1:
-                # bottom row kinds
-                if i == 0:
-                    kind = "toggle"
-                    enabled = True
-                elif i == 2:
-                    kind = "backspace"
-                    enabled = True
-                else:
-                    kind = "spacer"
-                    enabled = False
-            else:
+            layout.append(("TOGGLE", rect, True, "toggle")); x += key_w + pad
+            # middle spacer
+            rect = pygame.Rect(x, y, key_w, key_h)
+            layout.append(("SPACE", rect, False, "spacer")); x += key_w + pad
+            # right = backspace
+            rect = pygame.Rect(x, y, key_w, key_h)
+            layout.append(("BACK", rect, True, "backspace"))
+        else:
+            # center shorter rows
+            nkeys = len(row)
+            key_w = (WIDTH - (nkeys + 1) * pad) // nkeys
+            x = pad
+            for label in row:
+                rect = pygame.Rect(x, y, key_w, key_h)
                 kind = "char"
-                # Enabled if allowed char set; I and O appear disabled on letters; all numbers shown are allowed
-                enabled = (label in ALLOWED_CHARS) and (label not in disabled)
-                # For letters mode, label might be I/O which is NOT in ALLOWED_CHARS; keep as disabled
+                enabled = (label in ALLOWED_CHARS)
                 if keyboard_mode == "letters" and label in ("I","O"):
                     enabled = False
-            layout.append((label, rect, enabled, kind))
-            x += key_w + pad
+                layout.append((label, rect, enabled, kind))
+                x += key_w + pad
         y += key_h + pad
 
     return layout
@@ -432,7 +463,7 @@ def draw_keyboard():
         elif kind == "backspace":
             txt_label = "←"
 
-        color = (240,240,240) if (enabled or kind in ("backspace","toggle")) else (120,120,120)
+        color = (240,240,240) if (enabled or (kind in ("backspace","toggle"))) else (120,120,120)
         txt = FONT.render(txt_label, True, color)
         SCREEN.blit(txt, (rect.centerx - txt.get_width()//2, rect.centery - txt.get_height()//2))
 
