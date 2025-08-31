@@ -25,12 +25,41 @@ except Exception as e:
 MUSIC_VOLUME = 0.6
 SFX_VOLUME   = 0.8
 is_muted = False
+MUSIC_STARTED = False  # iOS: only start after user gesture
 
+def _apply_mute_state():
+    if not SOUND_ENABLED:
+        return
+    vol_music = 0.0 if is_muted else MUSIC_VOLUME
+    vol_sfx   = 0.0 if is_muted else SFX_VOLUME
+    try:
+        pygame.mixer.music.set_volume(vol_music)
+    except Exception:
+        pass
+    try:
+        if SFX_REWARD:   SFX_REWARD.set_volume(vol_sfx)
+        if SFX_GAMEOVER: SFX_GAMEOVER.set_volume(vol_sfx)
+    except Exception:
+        pass
+
+def maybe_start_music():
+    """Start looping music after a user gesture (needed on iOS)."""
+    global MUSIC_STARTED
+    if not SOUND_ENABLED or MUSIC_STARTED:
+        return
+    try:
+        pygame.mixer.music.play(-1)
+        _apply_mute_state()
+        MUSIC_STARTED = True
+    except Exception:
+        pass
+
+# Load sounds (but DO NOT autoplay the music yet)
 if SOUND_ENABLED:
     try:
         pygame.mixer.music.load("flappy_capy_smooth_loop.ogg")
         pygame.mixer.music.set_volume(MUSIC_VOLUME)
-        pygame.mixer.music.play(-1)
+        # Do not play here; wait for user action
     except Exception:
         pass
     try:
@@ -44,17 +73,6 @@ if SOUND_ENABLED:
 else:
     SFX_REWARD = None
     SFX_GAMEOVER = None
-
-def _apply_mute_state():
-    if not SOUND_ENABLED: return
-    vol_music = 0.0 if is_muted else MUSIC_VOLUME
-    vol_sfx   = 0.0 if is_muted else SFX_VOLUME
-    try: pygame.mixer.music.set_volume(vol_music)
-    except: pass
-    try:
-        if SFX_REWARD:   SFX_REWARD.set_volume(vol_sfx)
-        if SFX_GAMEOVER: SFX_GAMEOVER.set_volume(vol_sfx)
-    except: pass
 
 MUTE_BTN_SIZE = 36
 mute_button_rect = pygame.Rect(WIDTH - MUTE_BTN_SIZE - 10, 10, MUTE_BTN_SIZE, MUTE_BTN_SIZE)
@@ -197,16 +215,18 @@ def check_collision_single_column():
     for ob in obstacles:
         r1, r2 = obstacle_hitboxes(ob)
         if capy_rect.colliderect(r1) or capy_rect.colliderect(r2): return False
-        # pass-through scoring handled elsewhere
     if capy_rect.top <= -50 or capy_rect.bottom >= HEIGHT: return False
     return True
 
 # =========================
 #  HUMAN CHECK
 # =========================
-def next_challenge_increment(): return random.randint(10, 11)
+def next_challenge_increment(): return random.randint(5, 5)
 next_challenge_at = next_challenge_increment()
 challenge = {"code":"","typed":"","deadline":0.0,"active":False,"time_limit":9.5}
+
+# Input rect for mobile keyboards (matches the overlay box)
+CHALLENGE_INPUT_RECT = pygame.Rect(WIDTH//2 - 130, HEIGHT//2 - 40, 260, 80)
 
 def random_code(n=4):
     alphabet = [c for c in string.ascii_uppercase if c not in ("O","I")]
@@ -222,6 +242,12 @@ def start_challenge():
     challenge["deadline"] = time.perf_counter() + challenge["time_limit"]
     challenge["active"] = True
     game_state = "challenge"
+    # Mobile keyboards: start text input and anchor to the code box
+    try:
+        pygame.key.set_text_input_rect(CHALLENGE_INPUT_RECT)
+        pygame.key.start_text_input()
+    except Exception:
+        pass
 
 # =========================
 #  UI HELPERS
@@ -301,11 +327,15 @@ while True:
             if _point_in(mute_button_rect, event.pos):
                 is_muted = not is_muted
                 _apply_mute_state()
+                maybe_start_music()  # if first tap is the mute, allow music later
                 continue  # DO NOT propagate to gameplay click handling
 
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+        # Mobile/desktop: hotkey to toggle mute
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_m and game_state != "challenge":
             is_muted = not is_muted
             _apply_mute_state()
+            continue
+
 
         if event.type == pygame.QUIT:
             pygame.quit(); sys.exit()
@@ -316,29 +346,45 @@ while True:
 
             if game_state in ("start","ready"):
                 if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                    maybe_start_music()
                     enter_play()
 
             elif game_state == "play":
                 if not paused_for_focus and event.key == pygame.K_SPACE:
+                    maybe_start_music()
                     try_flap()
 
             elif game_state == "challenge":
+                # BACKSPACE still arrives as KEYDOWN on soft keyboards
                 if event.key == pygame.K_BACKSPACE:
                     challenge["typed"] = challenge["typed"][:-1]
-                else:
-                    ch = event.unicode.upper()
-                    if ch and ch.isalnum() and ch not in ["O","I"]:
-                        challenge["typed"] = (challenge["typed"] + ch)[:4]
 
             elif game_state == "gameover":
                 if time.time() - gameover_time > 1 and event.key == pygame.K_r:
                     reset_game(); game_state = "ready"
 
-        # Normal gameplay click handling
+        # TEXTINPUT: soft keyboard characters for mobile
+        if event.type == pygame.TEXTINPUT and game_state == "challenge":
+            ch = event.text.upper()
+            if ch and ch.isalnum() and ch not in ["O","I"]:
+                challenge["typed"] = (challenge["typed"] + ch)[:4]
+            continue
+
+        # Normal gameplay click handling (after consuming mute click above)
         if event.type == pygame.MOUSEBUTTONDOWN:
+            # If user taps the challenge text box, re-focus text input on mobile
+            if game_state == "challenge" and CHALLENGE_INPUT_RECT.collidepoint(event.pos):
+                try:
+                    pygame.key.set_text_input_rect(CHALLENGE_INPUT_RECT)
+                    pygame.key.start_text_input()
+                except Exception:
+                    pass
+
             if game_state in ("start","ready"):
+                maybe_start_music()
                 enter_play()
             elif game_state == "play" and not paused_for_focus:
+                maybe_start_music()
                 try_flap()
             elif game_state == "gameover":
                 if time.time() - gameover_time > 1:
@@ -400,6 +446,10 @@ while True:
 
         if challenge["typed"] == challenge["code"]:
             # Passed: clear course and go to READY
+            try:
+                pygame.key.stop_text_input()
+            except Exception:
+                pass
             challenge["active"] = False
             game_state = "ready"
             challenge["typed"] = ""
@@ -412,6 +462,11 @@ while True:
             spawning_enabled = False
 
         elif time.perf_counter() > challenge["deadline"]:
+            # Failed challenge -> game over
+            try:
+                pygame.key.stop_text_input()
+            except Exception:
+                pass
             game_state = "gameover"
             gameover_time = time.time()
             spawning_enabled = False
