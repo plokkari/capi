@@ -36,7 +36,7 @@ jobs:
         with:
           version: latest
 
-      - name: Create pygbag.ini (force web build)
+      - name: Create pygbag.ini (force web build, ignore mp3/m4a)
         run: |
           printf "%s\n" \
           "[project]" \
@@ -50,8 +50,8 @@ jobs:
           "ignorefiles = *.mp3 *.m4a" \
           "ignoredirs  =" > pygbag.ini
 
-      # Remove formats pygbag forbids for web builds
-      - name: Remove MP3/M4A (pygbag forbids on web)
+      # Belt & suspenders: also remove mp3/m4a so pygbag can't see them
+      - name: Remove MP3/M4A (pygbag forbids these on web)
         run: |
           find . -maxdepth 1 -type f \( -name "*.mp3" -o -name "*.m4a" \) -print -delete || true
 
@@ -71,9 +71,10 @@ jobs:
             sleep 2
           done
           kill $PID || true
-          ls -la build/web
+          echo "--- build dir ---"; ls -la build || true
+          echo "--- build/web ---"; ls -la build/web || true
 
-      # Optional cosmetic patch
+      # Optional cosmetic patch (safe): hide status text/ui chrome
       - name: Patch game HTML (autostart + hide status text)
         run: |
           python - <<'PY'
@@ -108,17 +109,12 @@ jobs:
         run: |
           mkdir -p site/game
           cp -r build/web/* site/game/
-          # Use /game/index.html as the entry page; if no root index.html, make a redirect.
+          # If you have a root index.html, rewrite it to point at /game/
           if [ -f index.html ]; then
             sed -i 's|build/web/index.html|game/index.html|g' index.html || true
             cp index.html site/index.html
           else
-            cat > site/index.html <<'HTML'
-            <!doctype html><meta charset="utf-8">
-            <meta http-equiv="refresh" content="0; url=game/">
-            <title>Flappy Capy</title>
-            <a href="game/">Click here if you are not redirected…</a>
-            HTML
+            echo '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=game/"><title>Flappy Capy</title><a href="game/">Click here if you are not redirected…</a>' > site/index.html
           fi
 
       - name: Upload Pages artifact
