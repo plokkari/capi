@@ -4,6 +4,7 @@ import random
 import time
 import math
 import string
+import os
 
 # =========================
 #  SETUP
@@ -26,6 +27,38 @@ MUSIC_VOLUME = 0.6
 SFX_VOLUME   = 0.8
 is_muted = False
 MUSIC_STARTED = False  # iOS: only start after user gesture
+
+def try_load_music(basenames):
+    """Try to load music using several extensions (for iOS Safari compatibility)."""
+    if not SOUND_ENABLED: 
+        return False
+    for base in basenames:
+        for ext in (".ogg", ".mp3", ".m4a", ".wav"):
+            path = base + ext
+            if os.path.exists(path):
+                try:
+                    pygame.mixer.music.load(path)
+                    pygame.mixer.music.set_volume(MUSIC_VOLUME)
+                    return True
+                except Exception:
+                    pass
+    return False
+
+def try_load_sfx(basenames):
+    """Return first Sound found among multiple extensions, else None."""
+    if not SOUND_ENABLED:
+        return None
+    for base in basenames:
+        for ext in (".ogg", ".mp3", ".m4a", ".wav"):
+            path = base + ext
+            if os.path.exists(path):
+                try:
+                    s = pygame.mixer.Sound(path)
+                    s.set_volume(SFX_VOLUME)
+                    return s
+                except Exception:
+                    pass
+    return None
 
 def _apply_mute_state():
     if not SOUND_ENABLED:
@@ -56,21 +89,13 @@ def maybe_start_music():
 
 # Load sounds (but DO NOT autoplay the music yet)
 if SOUND_ENABLED:
-    try:
-        pygame.mixer.music.load("flappy_capy_smooth_loop.ogg")
-        pygame.mixer.music.set_volume(MUSIC_VOLUME)
-        # Do not play here; wait for user action
-    except Exception:
-        pass
-    try:
-        SFX_REWARD   = pygame.mixer.Sound("reward_ding.ogg")
-        SFX_GAMEOVER = pygame.mixer.Sound("game_over_wah.ogg")
-        SFX_REWARD.set_volume(SFX_VOLUME)
-        SFX_GAMEOVER.set_volume(SFX_VOLUME)
-    except Exception:
-        SFX_REWARD = None
-        SFX_GAMEOVER = None
+    # Put MP3/M4A copies of your OGGs next to them for iOS Safari:
+    # flappy_capy_smooth_loop.mp3, reward_ding.mp3, game_over_wah.mp3 (or .m4a)
+    MUSIC_LOADED = try_load_music(["flappy_capy_smooth_loop"])
+    SFX_REWARD   = try_load_sfx(["reward_ding"])
+    SFX_GAMEOVER = try_load_sfx(["game_over_wah"])
 else:
+    MUSIC_LOADED = False
     SFX_REWARD = None
     SFX_GAMEOVER = None
 
@@ -221,7 +246,7 @@ def check_collision_single_column():
 # =========================
 #  HUMAN CHECK
 # =========================
-def next_challenge_increment(): return random.randint(5, 5)
+def next_challenge_increment(): return random.randint(25, 45)
 next_challenge_at = next_challenge_increment()
 challenge = {"code":"","typed":"","deadline":0.0,"active":False,"time_limit":9.5}
 
@@ -248,6 +273,63 @@ def start_challenge():
         pygame.key.start_text_input()
     except Exception:
         pass
+
+# =============== On-screen keypad for mobile (challenge) ===============
+ALLOWED_CHARS = [d for d in "23456789"] + [c for c in string.ascii_uppercase if c not in ("O","I")]
+KEYS_PER_ROW = 8
+KEYPAD_KEYS = ALLOWED_CHARS[:]  # 32 keys (8x4)
+KEYPAD_KEYS.append("←")         # Backspace key at the end
+
+def get_keypad_layout():
+    """Return list of (label, rect) for keypad buttons."""
+    # Place keypad in lower 45% of the screen
+    pad = 6
+    rows = []
+    total_rows = (len(KEYPAD_KEYS) + KEYS_PER_ROW - 1) // KEYS_PER_ROW
+    # Ensure at least 3 rows visible nicely; clamp height
+    avail_top = int(HEIGHT * 0.55)
+    avail_bottom = HEIGHT - 10
+    avail_h = max(120, avail_bottom - avail_top)
+    key_h = (avail_h - (total_rows + 1) * pad) // total_rows
+    key_w = (WIDTH - (KEYS_PER_ROW + 1) * pad) // KEYS_PER_ROW
+    y = avail_top + pad
+    idx = 0
+    layout = []
+    for r in range(total_rows):
+        x = pad
+        for c in range(KEYS_PER_ROW):
+            if idx >= len(KEYPAD_KEYS):
+                break
+            rect = pygame.Rect(x, y, key_w, key_h)
+            layout.append((KEYPAD_KEYS[idx], rect))
+            x += key_w + pad
+            idx += 1
+        y += key_h + pad
+    return layout
+
+def draw_keypad():
+    """Draw keypad; called only during challenge."""
+    keys = get_keypad_layout()
+    for label, rect in keys:
+        pygame.draw.rect(SCREEN, (25, 25, 25), rect, border_radius=8)
+        pygame.draw.rect(SCREEN, (210, 210, 210), rect, width=2, border_radius=8)
+        txt = FONT.render(label, True, (240,240,240))
+        SCREEN.blit(txt, (rect.centerx - txt.get_width()//2, rect.centery - txt.get_height()//2))
+
+def handle_keypad_click(pos):
+    """Process taps on keypad; returns True if it handled a key."""
+    if game_state != "challenge":
+        return False
+    for label, rect in get_keypad_layout():
+        if rect.collidepoint(pos):
+            if label == "←":
+                if challenge["typed"]:
+                    challenge["typed"] = challenge["typed"][:-1]
+            else:
+                if len(challenge["typed"]) < 4 and label in ALLOWED_CHARS:
+                    challenge["typed"] = challenge["typed"] + label
+            return True
+    return False
 
 # =========================
 #  UI HELPERS
@@ -307,6 +389,8 @@ def draw_challenge_overlay():
     timer_font = pygame.font.SysFont("Arial", 20)
     timer_surf = timer_font.render(f"{remaining:.1f}s", True, (255,200,200) if remaining<3 else (200,255,200))
     SCREEN.blit(timer_surf, (WIDTH//2 - timer_surf.get_width()//2, int(HEIGHT*0.72)))
+    # On-screen keypad (mobile-friendly)
+    draw_keypad()
 
 # =========================
 #  MAIN LOOP
@@ -330,12 +414,11 @@ while True:
                 maybe_start_music()  # if first tap is the mute, allow music later
                 continue  # DO NOT propagate to gameplay click handling
 
-        # Mobile/desktop: hotkey to toggle mute
+        # Mobile/desktop: hotkey to toggle mute (disabled during challenge so typing 'M' doesn't mute)
         if event.type == pygame.KEYDOWN and event.key == pygame.K_m and game_state != "challenge":
             is_muted = not is_muted
             _apply_mute_state()
             continue
-
 
         if event.type == pygame.QUIT:
             pygame.quit(); sys.exit()
@@ -355,7 +438,7 @@ while True:
                     try_flap()
 
             elif game_state == "challenge":
-                # BACKSPACE still arrives as KEYDOWN on soft keyboards
+                # BACKSPACE still arrives as KEYDOWN on soft keyboards / desktop
                 if event.key == pygame.K_BACKSPACE:
                     challenge["typed"] = challenge["typed"][:-1]
 
@@ -363,22 +446,28 @@ while True:
                 if time.time() - gameover_time > 1 and event.key == pygame.K_r:
                     reset_game(); game_state = "ready"
 
-        # TEXTINPUT: soft keyboard characters for mobile
+        # TEXTINPUT: soft keyboard characters for mobile / desktop IME
         if event.type == pygame.TEXTINPUT and game_state == "challenge":
             ch = event.text.upper()
             if ch and ch.isalnum() and ch not in ["O","I"]:
-                challenge["typed"] = (challenge["typed"] + ch)[:4]
+                if len(challenge["typed"]) < 4:
+                    challenge["typed"] = (challenge["typed"] + ch)
             continue
 
         # Normal gameplay click handling (after consuming mute click above)
         if event.type == pygame.MOUSEBUTTONDOWN:
             # If user taps the challenge text box, re-focus text input on mobile
-            if game_state == "challenge" and CHALLENGE_INPUT_RECT.collidepoint(event.pos):
-                try:
-                    pygame.key.set_text_input_rect(CHALLENGE_INPUT_RECT)
-                    pygame.key.start_text_input()
-                except Exception:
-                    pass
+            if game_state == "challenge":
+                # On-screen keypad tap?
+                if handle_keypad_click(event.pos):
+                    maybe_start_music()  # harmless
+                    continue
+                if CHALLENGE_INPUT_RECT.collidepoint(event.pos):
+                    try:
+                        pygame.key.set_text_input_rect(CHALLENGE_INPUT_RECT)
+                        pygame.key.start_text_input()
+                    except Exception:
+                        pass
 
             if game_state in ("start","ready"):
                 maybe_start_music()
