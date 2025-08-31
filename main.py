@@ -246,7 +246,7 @@ def check_collision_single_column():
 # =========================
 #  HUMAN CHECK
 # =========================
-def next_challenge_increment(): return random.randint(25, 45)
+def next_challenge_increment(): return random.randint(5, 5)
 next_challenge_at = next_challenge_increment()
 challenge = {"code":"","typed":"","deadline":0.0,"active":False,"time_limit":9.5}
 
