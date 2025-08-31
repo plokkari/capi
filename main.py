@@ -17,8 +17,12 @@ pygame.display.set_caption("Flappy Capy 🐹")
 # =========================
 #  AUDIO & MUTE SETUP
 # =========================
+import sys as _sys
+
 SOUND_ENABLED = True
 try:
+    # more reliable on iOS/web
+    pygame.mixer.pre_init(44100, -16, 2, 512)
     pygame.mixer.init()
 except Exception as e:
     SOUND_ENABLED = False
@@ -26,78 +30,102 @@ except Exception as e:
 MUSIC_VOLUME = 0.6
 SFX_VOLUME   = 0.8
 is_muted = False
-MUSIC_STARTED = False  # iOS: only start after user gesture
+MUSIC_STARTED = False  # start only after first user gesture
+IS_WEB = (_sys.platform == "emscripten")
 
-def try_load_music(basenames):
-    """Try to load music using several extensions (for iOS Safari compatibility)."""
-    if not SOUND_ENABLED: 
-        return False
-    for base in basenames:
-        for ext in (".ogg", ".mp3", ".m4a", ".wav"):
-            path = base + ext
-            if os.path.exists(path):
-                try:
-                    pygame.mixer.music.load(path)
-                    pygame.mixer.music.set_volume(MUSIC_VOLUME)
-                    return True
-                except Exception:
-                    pass
-    return False
+# On web: avoid pygame.mixer.music streaming; loop a Sound on a channel instead
+MUSIC_CHANNEL = None
+MUSIC_BG = None  # background loop as Sound on web; None on desktop
 
-def try_load_sfx(basenames):
-    """Return first Sound found among multiple extensions, else None."""
-    if not SOUND_ENABLED:
-        return None
-    for base in basenames:
-        for ext in (".ogg", ".mp3", ".m4a", ".wav"):
-            path = base + ext
-            if os.path.exists(path):
-                try:
-                    s = pygame.mixer.Sound(path)
-                    s.set_volume(SFX_VOLUME)
-                    return s
-                except Exception:
-                    pass
-    return None
+SFX_REWARD = None
+SFX_GAMEOVER = None
 
 def _apply_mute_state():
     if not SOUND_ENABLED:
         return
-    vol_music = 0.0 if is_muted else MUSIC_VOLUME
-    vol_sfx   = 0.0 if is_muted else SFX_VOLUME
+    music_vol = 0.0 if is_muted else MUSIC_VOLUME
+    sfx_vol   = 0.0 if is_muted else SFX_VOLUME
+    # desktop music stream
+    if not IS_WEB:
+        try: pygame.mixer.music.set_volume(music_vol)
+        except Exception: pass
+    # web music channel
+    if IS_WEB and MUSIC_CHANNEL is not None:
+        try: MUSIC_CHANNEL.set_volume(music_vol)
+        except Exception: pass
+    # sfx
     try:
-        pygame.mixer.music.set_volume(vol_music)
-    except Exception:
-        pass
-    try:
-        if SFX_REWARD:   SFX_REWARD.set_volume(vol_sfx)
-        if SFX_GAMEOVER: SFX_GAMEOVER.set_volume(vol_sfx)
+        if SFX_REWARD:   SFX_REWARD.set_volume(sfx_vol)
+        if SFX_GAMEOVER: SFX_GAMEOVER.set_volume(sfx_vol)
     except Exception:
         pass
 
+def _first_existing_sound(basename, exts):
+    """Return the first existing path for basename among given extensions."""
+    for ext in exts:
+        p = basename + ext
+        if os.path.exists(p):
+            return p
+    return None
+
+# Load sounds (do NOT autoplay the music yet)
+if SOUND_ENABLED:
+    # On web prefer .wav/.ogg (pygbag forbids mp3/m4a). Desktop can try mp3/m4a too.
+    music_path  = _first_existing_sound("flappy_capy_smooth_loop",
+                                        (".wav", ".ogg") if IS_WEB else (".ogg", ".wav", ".mp3", ".m4a"))
+    reward_path = _first_existing_sound("reward_ding",
+                                        (".wav", ".ogg") if IS_WEB else (".ogg", ".wav", ".mp3", ".m4a"))
+    over_path   = _first_existing_sound("game_over_wah",
+                                        (".wav", ".ogg") if IS_WEB else (".ogg", ".wav", ".mp3", ".m4a"))
+
+    try:
+        if IS_WEB:
+            # Use Sound on a dedicated channel for background loop
+            if music_path:
+                MUSIC_BG = pygame.mixer.Sound(music_path)
+        else:
+            # Desktop: stream via mixer.music
+            if music_path:
+                pygame.mixer.music.load(music_path)
+                pygame.mixer.music.set_volume(MUSIC_VOLUME)
+    except Exception:
+        pass
+
+    try:
+        if reward_path:
+            SFX_REWARD = pygame.mixer.Sound(reward_path)
+            SFX_REWARD.set_volume(SFX_VOLUME)
+        if over_path:
+            SFX_GAMEOVER = pygame.mixer.Sound(over_path)
+            SFX_GAMEOVER.set_volume(SFX_VOLUME)
+    except Exception:
+        SFX_REWARD = SFX_REWARD or None
+        SFX_GAMEOVER = SFX_GAMEOVER or None
+else:
+    MUSIC_BG = None
+    SFX_REWARD = None
+    SFX_GAMEOVER = None
+
 def maybe_start_music():
-    """Start looping music after a user gesture (needed on iOS)."""
-    global MUSIC_STARTED
+    """Start looping music after a user gesture (required on iOS)."""
+    global MUSIC_STARTED, MUSIC_CHANNEL
     if not SOUND_ENABLED or MUSIC_STARTED:
         return
     try:
-        pygame.mixer.music.play(-1)
-        _apply_mute_state()
+        if IS_WEB:
+            if MUSIC_BG is not None:
+                # Reserve channel 0 for background music
+                if MUSIC_CHANNEL is None:
+                    pygame.mixer.set_num_channels(max(8, pygame.mixer.get_num_channels()))
+                    MUSIC_CHANNEL = pygame.mixer.Channel(0)
+                MUSIC_CHANNEL.play(MUSIC_BG, loops=-1)
+                MUSIC_CHANNEL.set_volume(0.0 if is_muted else MUSIC_VOLUME)
+        else:
+            pygame.mixer.music.play(-1)
+            _apply_mute_state()
         MUSIC_STARTED = True
     except Exception:
         pass
-
-# Load sounds (but DO NOT autoplay the music yet)
-if SOUND_ENABLED:
-    # Put MP3/M4A copies of your OGGs next to them for iOS Safari:
-    # flappy_capy_smooth_loop.mp3, reward_ding.mp3, game_over_wah.mp3 (or .m4a)
-    MUSIC_LOADED = try_load_music(["flappy_capy_smooth_loop"])
-    SFX_REWARD   = try_load_sfx(["reward_ding"])
-    SFX_GAMEOVER = try_load_sfx(["game_over_wah"])
-else:
-    MUSIC_LOADED = False
-    SFX_REWARD = None
-    SFX_GAMEOVER = None
 
 MUTE_BTN_SIZE = 36
 mute_button_rect = pygame.Rect(WIDTH - MUTE_BTN_SIZE - 10, 10, MUTE_BTN_SIZE, MUTE_BTN_SIZE)
@@ -383,7 +411,7 @@ def draw_challenge_overlay():
     code_surf = FONT.render(code, True, (255,255,255))
     SCREEN.blit(code_surf, (WIDTH//2 - code_surf.get_width()//2, box_rect.y+8))
     typed_font = pygame.font.SysFont("Arial", 26)
-    typed_surf = typed_font.render(typed or " ", True, (180,220,255))
+    typed_surf = pygame.font.SysFont("Arial", 26).render(typed or " ", True, (180,220,255))
     SCREEN.blit(typed_surf, (WIDTH//2 - typed_surf.get_width()//2, box_rect.y+46))
     remaining = max(0.0, challenge["deadline"] - time.perf_counter())
     timer_font = pygame.font.SysFont("Arial", 20)
