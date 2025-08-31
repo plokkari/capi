@@ -13,16 +13,83 @@ WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Flappy Capy 🐹")
 
+# =========================
+#  AUDIO & MUTE SETUP
+# =========================
+SOUND_ENABLED = True
+try:
+    pygame.mixer.init()
+except Exception as e:
+    SOUND_ENABLED = False
+
+MUSIC_VOLUME = 0.6
+SFX_VOLUME   = 0.8
+is_muted = False
+
+if SOUND_ENABLED:
+    try:
+        pygame.mixer.music.load("flappy_capy_smooth_loop.ogg")
+        pygame.mixer.music.set_volume(MUSIC_VOLUME)
+        pygame.mixer.music.play(-1)
+    except Exception:
+        pass
+    try:
+        SFX_REWARD   = pygame.mixer.Sound("reward_ding.ogg")
+        SFX_GAMEOVER = pygame.mixer.Sound("game_over_wah.ogg")
+        SFX_REWARD.set_volume(SFX_VOLUME)
+        SFX_GAMEOVER.set_volume(SFX_VOLUME)
+    except Exception:
+        SFX_REWARD = None
+        SFX_GAMEOVER = None
+else:
+    SFX_REWARD = None
+    SFX_GAMEOVER = None
+
+def _apply_mute_state():
+    if not SOUND_ENABLED: return
+    vol_music = 0.0 if is_muted else MUSIC_VOLUME
+    vol_sfx   = 0.0 if is_muted else SFX_VOLUME
+    try: pygame.mixer.music.set_volume(vol_music)
+    except: pass
+    try:
+        if SFX_REWARD:   SFX_REWARD.set_volume(vol_sfx)
+        if SFX_GAMEOVER: SFX_GAMEOVER.set_volume(vol_sfx)
+    except: pass
+
+MUTE_BTN_SIZE = 36
+mute_button_rect = pygame.Rect(WIDTH - MUTE_BTN_SIZE - 10, 10, MUTE_BTN_SIZE, MUTE_BTN_SIZE)
+
+def draw_mute_button():
+    pygame.draw.rect(SCREEN, (0,0,0), mute_button_rect, border_radius=8)
+    pygame.draw.rect(SCREEN, (220,220,220), mute_button_rect, width=2, border_radius=8)
+    pad = 8
+    x, y, w, h = mute_button_rect
+    inner = pygame.Rect(x+pad, y+pad, w-2*pad, h-2*pad)
+    head = pygame.Rect(inner.x, inner.y, inner.w, int(inner.h*0.55))
+    pygame.draw.ellipse(SCREEN, (255,255,255), head, width=2)
+    stem_h = int(inner.h*0.3)
+    stem_y = head.bottom - 2
+    stem = pygame.Rect(inner.centerx-3, stem_y, 6, stem_h)
+    pygame.draw.rect(SCREEN, (255,255,255), stem, width=2)
+    base_w = int(inner.w*0.6)
+    base_rect = pygame.Rect(inner.centerx - base_w//2, stem.bottom-1, base_w, 3)
+    pygame.draw.rect(SCREEN, (255,255,255), base_rect)
+    if is_muted:
+        pygame.draw.line(SCREEN, (230,60,60), (x+6, y+6), (x+w-6, y+h-6), 4)
+
+def _point_in(rect, pos): return rect.collidepoint(pos)
+
 CLOCK = pygame.time.Clock()
 FONT = pygame.font.SysFont("Arial", 32)
 
 # --- Game variables ---
 gravity = 0.5
 capy_movement = 0
-game_state = "start"   # "start" | "ready" | "play" | "challenge" | "gameover"
+game_state = "start"
 score = 0
 high_score = 0
 gameover_time = 0
+played_gameover_sound = False
 
 # --- HARDEN: flap rate limit ---
 MAX_FLAPS_PER_SEC = 12.0
@@ -43,24 +110,23 @@ background_img = pygame.image.load("capy back.png").convert()
 background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
 
 capy_img = pygame.image.load("flappy capy.png").convert_alpha()
-capy_img = pygame.transform.scale(capy_img, (60, 45))     # visual size
-capy_rect = pygame.Rect(0, 0, 40, 30)                     # hitbox
+capy_img = pygame.transform.scale(capy_img, (60, 45))
+capy_rect = pygame.Rect(0, 0, 40, 30)
 capy_rect.center = (100, HEIGHT // 2)
 
 # =========================
-#  PILLARS (distance-based spawner)
+#  PILLARS
 # =========================
 OBSTACLE_WIDTH = 60
 SCROLL_SPEED   = 150
-
-SPAWN_OFFSET_X        = WIDTH + 60   # where new pillars appear (off-screen to the right)
-OBSTACLE_SPACING_X    = 130          # base horizontal spacing between pillars
-SPACING_JITTER        = 15           # +/- pixels random variation each spawn
-SPAWN_EDGE_GUARD      = 40           # guard to avoid same-frame overlap at spawn edge
+SPAWN_OFFSET_X = WIDTH + 60
+OBSTACLE_SPACING_X = 130
+SPACING_JITTER = 15
+SPAWN_EDGE_GUARD = 40
 
 obstacles = []
-spawning_enabled = False   # turned on only in "play"
-next_spacing_x = OBSTACLE_SPACING_X  # will be randomized each spawn
+spawning_enabled = False
+next_spacing_x = OBSTACLE_SPACING_X
 
 def make_pillar_surface(gap_y, gap_size):
     surf = pygame.Surface((OBSTACLE_WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -68,10 +134,8 @@ def make_pillar_surface(gap_y, gap_size):
     coin_edge = (180, 115, 30)
     gap_top = max(0, gap_y - gap_size // 2)
     gap_bot = min(HEIGHT, gap_y + gap_size // 2)
-
     top_rect    = pygame.Rect(0, 0, OBSTACLE_WIDTH, max(0, gap_top))
     bottom_rect = pygame.Rect(0, gap_bot, OBSTACLE_WIDTH, max(0, HEIGHT - gap_bot))
-
     def draw_section(rect):
         if rect.height <= 0: return
         pygame.draw.rect(surf, coin_face, rect)
@@ -84,40 +148,26 @@ def make_pillar_surface(gap_y, gap_size):
             band_top = max(rect.top + 2, y)
             band_bottom = min(rect.bottom - 2, y + 6)
             if band_bottom > band_top:
-                pygame.draw.rect(surf, coin_edge,
-                                 (rect.left + 4, band_top, rect.width - 8, band_bottom - band_top))
+                pygame.draw.rect(surf, coin_edge, (rect.left+4, band_top, rect.width-8, band_bottom-band_top))
             y += band_h
-
-    draw_section(top_rect)
-    draw_section(bottom_rect)
-
+    draw_section(top_rect); draw_section(bottom_rect)
     gap_rect = pygame.Rect(0, gap_top, OBSTACLE_WIDTH, max(0, gap_bot - gap_top))
-    if gap_rect.height > 0:
-        surf.fill((0, 0, 0, 0), gap_rect)
+    if gap_rect.height > 0: surf.fill((0,0,0,0), gap_rect)
     return surf
 
 def spawn_obstacle():
-    # guard: don't double-spawn exactly at the edge in the same frame
     if obstacles:
         last_x = obstacles[-1]["x"]
-        if last_x > SPAWN_OFFSET_X - SPAWN_EDGE_GUARD:
-            return
+        if last_x > SPAWN_OFFSET_X - SPAWN_EDGE_GUARD: return
     gap_size = random.randint(150, 180)
-    margin   = 100
-    gap_y    = random.randint(margin, HEIGHT - margin)
-    obstacles.append({
-        "x": SPAWN_OFFSET_X,
-        "gap_y": gap_y,
-        "gap_size": gap_size,
-        "surf": make_pillar_surface(gap_y, gap_size),
-        "scored": False,
-    })
+    margin = 100
+    gap_y = random.randint(margin, HEIGHT - margin)
+    obstacles.append({"x": SPAWN_OFFSET_X,"gap_y": gap_y,"gap_size": gap_size,
+                      "surf": make_pillar_surface(gap_y, gap_size),"scored": False})
 
 def maybe_spawn_by_distance():
-    # new pillar spawns only after the last one moved far enough left
     global next_spacing_x
-    if not spawning_enabled:
-        return
+    if not spawning_enabled: return
     if not obstacles:
         spawn_obstacle()
         next_spacing_x = OBSTACLE_SPACING_X + random.randint(-SPACING_JITTER, SPACING_JITTER)
@@ -131,55 +181,42 @@ def update_obstacles(dt):
     alive = []
     for ob in obstacles:
         ob["x"] -= SCROLL_SPEED * dt
-        if ob["x"] + OBSTACLE_WIDTH > -50:
-            alive.append(ob)
+        if ob["x"] + OBSTACLE_WIDTH > -50: alive.append(ob)
     return alive
 
 def draw_obstacles():
-    for ob in obstacles:
-        SCREEN.blit(ob["surf"], (int(ob["x"]), 0))
+    for ob in obstacles: SCREEN.blit(ob["surf"], (int(ob["x"]), 0))
 
 def obstacle_hitboxes(ob):
-    x = int(ob["x"])
-    gap_y = ob["gap_y"]
-    gap_size = ob["gap_size"]
-    top_rect    = pygame.Rect(x, 0, OBSTACLE_WIDTH, gap_y - gap_size // 2)
-    bottom_rect = pygame.Rect(x, gap_y + gap_size // 2, OBSTACLE_WIDTH, HEIGHT - (gap_y + gap_size // 2))
+    x = int(ob["x"]); gap_y = ob["gap_y"]; gap_size = ob["gap_size"]
+    top_rect = pygame.Rect(x,0,OBSTACLE_WIDTH,gap_y-gap_size//2)
+    bottom_rect = pygame.Rect(x,gap_y+gap_size//2,OBSTACLE_WIDTH,HEIGHT-(gap_y+gap_size//2))
     return top_rect, bottom_rect
 
 def check_collision_single_column():
     for ob in obstacles:
         r1, r2 = obstacle_hitboxes(ob)
-        if capy_rect.colliderect(r1) or capy_rect.colliderect(r2):
-            return False
-    if capy_rect.top <= -50 or capy_rect.bottom >= HEIGHT:
-        return False
+        if capy_rect.colliderect(r1) or capy_rect.colliderect(r2): return False
+        # pass-through scoring handled elsewhere
+    if capy_rect.top <= -50 or capy_rect.bottom >= HEIGHT: return False
     return True
 
 # =========================
 #  HUMAN CHECK
 # =========================
-def next_challenge_increment():
-    return random.randint(25, 45)
-
+def next_challenge_increment(): return random.randint(10, 11)
 next_challenge_at = next_challenge_increment()
-challenge = {
-    "code": "",
-    "typed": "",
-    "deadline": 0.0,
-    "active": False,
-    "time_limit": 9.5,  # seconds to answer
-}
+challenge = {"code":"","typed":"","deadline":0.0,"active":False,"time_limit":9.5}
 
 def random_code(n=4):
-    alphabet = [c for c in string.ascii_uppercase if c not in ("O", "I")]
+    alphabet = [c for c in string.ascii_uppercase if c not in ("O","I")]
     digits   = [d for d in "23456789"]
     pool = alphabet + digits
     return "".join(random.choice(pool) for _ in range(n))
 
 def start_challenge():
     global game_state, challenge, spawning_enabled
-    spawning_enabled = False  # pause spawns
+    spawning_enabled = False
     challenge["code"] = random_code(4)
     challenge["typed"] = ""
     challenge["deadline"] = time.perf_counter() + challenge["time_limit"]
@@ -192,20 +229,20 @@ def start_challenge():
 def draw_text_center(text, size, y, color=(255,255,255)):
     f = pygame.font.SysFont("Arial", size, bold=True)
     s = f.render(text, True, color)
-    SCREEN.blit(s, (WIDTH // 2 - s.get_width() // 2, y))
+    SCREEN.blit(s, (WIDTH//2 - s.get_width()//2, y))
 
 def score_display(mode):
     if mode == "main":
-        s = FONT.render(f"Score: {int(score)}", True, (255, 255, 255))
-        SCREEN.blit(s, (10, 10))
+        s = FONT.render(f"Score: {int(score)}", True, (255,255,255))
+        SCREEN.blit(s, (10,10))
     elif mode == "game_over":
-        s  = FONT.render(f"Score: {int(score)}", True, (255, 255, 255))
-        hs = FONT.render(f"High Score: {int(high_score)}", True, (255, 255, 255))
-        SCREEN.blit(s,  (WIDTH // 2 - s.get_width() // 2,  HEIGHT // 2 - 40))
-        SCREEN.blit(hs, (WIDTH // 2 - hs.get_width() // 2, HEIGHT // 2))
+        s  = FONT.render(f"Score: {int(score)}", True, (255,255,255))
+        hs = FONT.render(f"High Score: {int(high_score)}", True, (255,255,255))
+        SCREEN.blit(s,  (WIDTH//2 - s.get_width()//2,  HEIGHT//2 - 40))
+        SCREEN.blit(hs, (WIDTH//2 - hs.get_width()//2, HEIGHT//2))
 
 def reset_game():
-    global capy_movement, score, obstacles, next_challenge_at, challenge, spawning_enabled, next_spacing_x
+    global capy_movement, score, obstacles, next_challenge_at, challenge, spawning_enabled, next_spacing_x, played_gameover_sound
     capy_rect.center = (100, HEIGHT // 2)
     capy_movement = 0
     obstacles = []
@@ -217,34 +254,33 @@ def reset_game():
     challenge["deadline"] = 0.0
     spawning_enabled = False
     next_spacing_x = OBSTACLE_SPACING_X + random.randint(-SPACING_JITTER, SPACING_JITTER)
+    played_gameover_sound = False
+    _apply_mute_state()
 
-# Helper: enter play state (from start/ready)
 def enter_play():
     global game_state, spawning_enabled, next_spacing_x
-    game_state = "play"
-    spawning_enabled = True
+    game_state = "play"; spawning_enabled = True
     next_spacing_x = OBSTACLE_SPACING_X + random.randint(-SPACING_JITTER, SPACING_JITTER)
 
 def draw_challenge_overlay():
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 160))
-    SCREEN.blit(overlay, (0, 0))
-    draw_text_center("Quick Check!", 34, int(HEIGHT * 0.22), (255, 215, 120))
-    draw_text_center("Type this code to continue", 20, int(HEIGHT * 0.32), (230, 230, 230))
+    overlay.fill((0,0,0,160)); SCREEN.blit(overlay, (0,0))
+    draw_text_center("Quick Check!", 34, int(HEIGHT*0.22), (255,215,120))
+    draw_text_center("Type this code to continue", 20, int(HEIGHT*0.32), (230,230,230))
     code = challenge["code"]; typed = challenge["typed"]
     box_w, box_h = 260, 80
     box_rect = pygame.Rect(WIDTH//2 - box_w//2, HEIGHT//2 - box_h//2, box_w, box_h)
-    pygame.draw.rect(SCREEN, (30, 30, 30), box_rect, border_radius=10)
-    pygame.draw.rect(SCREEN, (200, 180, 90), box_rect, width=3, border_radius=10)
-    code_surf = FONT.render(code, True, (255, 255, 255))
-    SCREEN.blit(code_surf, (WIDTH//2 - code_surf.get_width()//2, box_rect.y + 8))
+    pygame.draw.rect(SCREEN, (30,30,30), box_rect, border_radius=10)
+    pygame.draw.rect(SCREEN, (200,180,90), box_rect, width=3, border_radius=10)
+    code_surf = FONT.render(code, True, (255,255,255))
+    SCREEN.blit(code_surf, (WIDTH//2 - code_surf.get_width()//2, box_rect.y+8))
     typed_font = pygame.font.SysFont("Arial", 26)
-    typed_surf = typed_font.render(typed or " ", True, (180, 220, 255))
-    SCREEN.blit(typed_surf, (WIDTH//2 - typed_surf.get_width()//2, box_rect.y + 46))
+    typed_surf = typed_font.render(typed or " ", True, (180,220,255))
+    SCREEN.blit(typed_surf, (WIDTH//2 - typed_surf.get_width()//2, box_rect.y+46))
     remaining = max(0.0, challenge["deadline"] - time.perf_counter())
     timer_font = pygame.font.SysFont("Arial", 20)
-    timer_surf = timer_font.render(f"{remaining:.1f}s", True, (255,200,200) if remaining < 3 else (200,255,200))
-    SCREEN.blit(timer_surf, (WIDTH//2 - timer_surf.get_width()//2, int(HEIGHT * 0.72)))
+    timer_surf = timer_font.render(f"{remaining:.1f}s", True, (255,200,200) if remaining<3 else (200,255,200))
+    SCREEN.blit(timer_surf, (WIDTH//2 - timer_surf.get_width()//2, int(HEIGHT*0.72)))
 
 # =========================
 #  MAIN LOOP
@@ -255,15 +291,22 @@ while True:
     now = time.perf_counter()
     dt = now - last_time
     last_time = now
-
-    # HARDEN: clamp dt to avoid slow-motion advantages
-    DT_MIN, DT_MAX = 0.0, 0.030
-    dt = max(DT_MIN, min(dt, DT_MAX))
-
+    dt = max(0.0, min(dt, 0.030))
     game_active = (game_state == "play")
     paused_for_focus = game_active and (not pygame.display.get_active())
 
     for event in pygame.event.get():
+        # --- MUTE BUTTON CLICK: consume the event so it doesn't trigger game actions ---
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if _point_in(mute_button_rect, event.pos):
+                is_muted = not is_muted
+                _apply_mute_state()
+                continue  # DO NOT propagate to gameplay click handling
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+            is_muted = not is_muted
+            _apply_mute_state()
+
         if event.type == pygame.QUIT:
             pygame.quit(); sys.exit()
 
@@ -271,7 +314,7 @@ while True:
             if event.key == pygame.K_ESCAPE:
                 pygame.quit(); sys.exit()
 
-            if game_state in ("start", "ready"):
+            if game_state in ("start","ready"):
                 if event.key in (pygame.K_SPACE, pygame.K_RETURN):
                     enter_play()
 
@@ -284,24 +327,26 @@ while True:
                     challenge["typed"] = challenge["typed"][:-1]
                 else:
                     ch = event.unicode.upper()
-                    if ch and ch.isalnum() and ch not in ["O", "I"]:
+                    if ch and ch.isalnum() and ch not in ["O","I"]:
                         challenge["typed"] = (challenge["typed"] + ch)[:4]
 
             elif game_state == "gameover":
-                if time.time() - gameover_time > 2 and event.key == pygame.K_r:
+                if time.time() - gameover_time > 1 and event.key == pygame.K_r:
                     reset_game(); game_state = "ready"
 
+        # Normal gameplay click handling
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if game_state in ("start", "ready"):
+            if game_state in ("start","ready"):
                 enter_play()
             elif game_state == "play" and not paused_for_focus:
                 try_flap()
             elif game_state == "gameover":
-                if time.time() - gameover_time > 2:
+                if time.time() - gameover_time > 1:
                     reset_game(); game_state = "ready"
 
     # Background
     SCREEN.blit(background_img, (0, 0))
+    # (draw other things; mute button will be drawn last)
 
     if game_state == "start":
         capy_rect.centery = int(HEIGHT*0.55 + 8*math.sin(pygame.time.get_ticks()*0.005))
@@ -318,67 +363,63 @@ while True:
         score_display("main")
 
     elif game_state == "play" and not paused_for_focus:
-        # Physics
         capy_movement += gravity
         capy_rect.centery += capy_movement
         capy_angle = -capy_movement * 3
         capy_rotated = pygame.transform.rotate(capy_img, capy_angle)
         SCREEN.blit(capy_rotated, capy_rotated.get_rect(center=capy_rect.center))
-
-        # Move + spawn-by-distance (no timers → no bunching)
         obstacles[:] = update_obstacles(dt)
         maybe_spawn_by_distance()
         draw_obstacles()
-
-        # Collisions
         if not check_collision_single_column():
-            game_state = "gameover"
-            gameover_time = time.time()
-            spawning_enabled = False
-
-        # Scoring
+            game_state = "gameover"; gameover_time = time.time(); spawning_enabled = False
+            if SOUND_ENABLED and (not is_muted) and SFX_GAMEOVER:
+                if not played_gameover_sound:
+                    try: SFX_GAMEOVER.play()
+                    except: pass
+                    played_gameover_sound = True
         for ob in obstacles:
-            if (not ob["scored"]) and (ob["x"] + OBSTACLE_WIDTH) < capy_rect.left:
-                score += 1
-                ob["scored"] = True
-
-        # Human check schedule
-        if score >= next_challenge_at:
-            start_challenge()
-
+            if (not ob["scored"]) and (ob["x"]+OBSTACLE_WIDTH) < capy_rect.left:
+                score += 1; ob["scored"] = True
+                if SOUND_ENABLED and (not is_muted) and SFX_REWARD:
+                    try: SFX_REWARD.play()
+                    except: pass
+        if score >= next_challenge_at: start_challenge()
         score_display("main")
 
     elif game_state == "play" and paused_for_focus:
-        draw_obstacles()
-        SCREEN.blit(capy_img, capy_img.get_rect(center=capy_rect.center))
+        draw_obstacles(); SCREEN.blit(capy_img, capy_img.get_rect(center=capy_rect.center))
         score_display("main")
         draw_text_center("Paused (click tab to return)", 20, int(HEIGHT*0.15), (200,200,200))
 
     elif game_state == "challenge":
-        # Frozen world
         draw_obstacles()
         SCREEN.blit(capy_img, capy_img.get_rect(center=capy_rect.center))
         score_display("main")
         draw_challenge_overlay()
 
         if challenge["typed"] == challenge["code"]:
-            # Passed: clear the course and go to READY. Fresh spawns begin when player continues.
+            # Passed: clear course and go to READY
             challenge["active"] = False
             game_state = "ready"
             challenge["typed"] = ""
             challenge["code"] = ""
             challenge["deadline"] = 0.0
-
-            obstacles.clear()     # PLAN A: clear all pillars
-            capy_movement = 0     # remove momentum so resume is fair
+            obstacles.clear()
+            capy_movement = 0
             next_spacing_x = OBSTACLE_SPACING_X + random.randint(-SPACING_JITTER, SPACING_JITTER)
             next_challenge_at = score + next_challenge_increment()
-            spawning_enabled = False  # stays off until player presses to continue
+            spawning_enabled = False
 
         elif time.perf_counter() > challenge["deadline"]:
             game_state = "gameover"
             gameover_time = time.time()
             spawning_enabled = False
+            if SOUND_ENABLED and (not is_muted) and SFX_GAMEOVER:
+                if not played_gameover_sound:
+                    try: SFX_GAMEOVER.play()
+                    except: pass
+                    played_gameover_sound = True
 
     else:  # gameover
         draw_obstacles()
@@ -389,6 +430,9 @@ while True:
         score_display("game_over")
         if time.time() - gameover_time > 1:
             draw_text_center("Press R / Tap to Try Again", 22, int(HEIGHT*0.68))
+
+    # --- Draw the mute button LAST so it stays on top of pillars/overlays ---
+    draw_mute_button()
 
     pygame.display.update()
     CLOCK.tick(60)
