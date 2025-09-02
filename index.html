@@ -1,130 +1,296 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Flappy Capy 🐹</title>
+  <meta charset="utf-8" />
+  <title>PixCapy — Leaderboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(180deg, #1a1a2e, #16213e);
-      color: #fff;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-height: 100vh; gap: 20px; padding: 16px;
+    :root { --bg:#0f1220; --card:#171b2e; --ink:#e8ecff; --muted:#9aa3c7; --accent:#7cc8ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink);
+           background:radial-gradient(1200px 800px at 10% -10%, #1a1f38 0%, var(--bg) 32%); }
+    header { padding:16px 20px; display:flex; align-items:center; gap:12px; }
+    header h1 { margin:0; font-size:20px; font-weight:700; letter-spacing:.3px; }
+    header .tag { font-size:12px; color:var(--muted); }
+
+    .wrap { display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:0 20px 20px; max-width:1200px; margin:0 auto; }
+    .card { background:var(--card); border:1px solid #243055; border-radius:14px; padding:14px;
+            box-shadow:0 12px 30px rgba(6,10,20,.25) inset, 0 1px 0 rgba(255,255,255,.04); }
+    .title { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .title h2 { margin:0; font-size:14px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
+    .title small { color:var(--muted); }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    input[type="email"], input[type="text"] {
+      background:#0c0f1e; color:var(--ink); border:1px solid #25335f; border-radius:10px; padding:10px 12px; flex:1 1 180px; outline:none;
     }
-    h1 { margin: 0; font-size: 2rem; text-align: center; }
-    p { opacity: 0.9; text-align: center; margin: 0; }
-    .btn {
-      padding: 14px 24px; font-size: 1rem; font-weight: bold;
-      background: #e94560; color: #fff; border: none; border-radius: 10px;
-    }
-    .btn:active { transform: scale(0.98); }
-    .game-area { width: 100%; max-width: 420px; display: none; flex-direction: column; gap: 8px; }
-    .game-frame { width: 100%; height: 640px; border: 0; border-radius: 10px; background: #000; }
-    footer { margin-top: 16px; opacity: 0.6; font-size: .9rem; text-align: center; }
+    button { appearance:none; border:1px solid #2c3a6b; background:linear-gradient(#1d2647,#0f1531);
+             color:#eaf2ff; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:600; }
+    button:hover { border-color:#3b4c85; }
+    .muted { color:var(--muted); }
+    ul.lb { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+    ul.lb li { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px;
+               background:#0c1023; border:1px solid #222f5a; border-radius:10px; }
+    ul.lb li strong { font-variant-numeric: tabular-nums; }
+    .gameBox { display:flex; align-items:center; justify-content:center; min-height: 620px; }
+    iframe { width:420px; height:640px; border:1px solid #243055; border-radius:12px; background:#000; }
+    .me { margin-top:6px; font-size:13px; color:var(--muted); }
   </style>
 </head>
 <body>
-  <h1>Flappy Capy 🐹</h1>
-  <p>Guide the business Capybara through the obstacles and earn your airdrops!</p>
+  <header>
+    <h1>PixCapy</h1>
+    <span class="tag">scoreboard + game</span>
+  </header>
 
-  <button id="play" class="btn">▶ Play Game</button>
+  <div class="wrap">
+    <!-- LEFT: auth + leaderboard -->
+    <section class="card">
+      <div class="title">
+        <h2>Sign in</h2>
+        <small id="me" class="me">Not signed in</small>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <input id="email" type="email" placeholder="you@email.com" />
+        <button id="sendOtp" type="button">Send link</button>
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <input id="otp" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="(optional) 6-digit code" />
+        <button id="verifyOtp" type="button">Verify</button>
+      </div>
 
-  <div id="gameArea" class="game-area">
-    <iframe id="gameFrame" class="game-frame" allow="autoplay; fullscreen"></iframe>
-    <small>Tip: tap anywhere inside the game to flap.</small>
+      <div class="title" style="margin-top:12px">
+        <h2>Top 10</h2>
+      </div>
+      <ul id="lb" class="lb">
+        <li class="muted"><span>No scores yet — be the first!</span><strong>—</strong></li>
+      </ul>
+    </section>
+
+    <!-- RIGHT: game -->
+    <section class="card gameBox">
+      <iframe id="gameFrame" title="PixCapy"></iframe>
+    </section>
   </div>
 
-  <footer>Made with ❤️ for the CapyCoin community</footer>
-
-  <script>
-    const GAME_URL  = "game/index.html";
-    const playBtn   = document.getElementById("play");
-    const gameArea  = document.getElementById("gameArea");
-    const gameFrame = document.getElementById("gameFrame");
-
-    function sendKey(doc, key) {
-      const opts = {bubbles:true, cancelable:true, key, code:key, which:key === " " ? 32 : 13, keyCode:key === " " ? 32 : 13};
-      doc.dispatchEvent(new KeyboardEvent("keydown", opts));
-      doc.dispatchEvent(new KeyboardEvent("keyup",   opts));
+  <!-- Supabase + game wiring -->
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+  
+    // --- Config ---
+    const SUPABASE_URL = "https://bncmbgjnelhythdhsefk.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuY21iZ2puZWxoeXRoZGhzZWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NjcxMDksImV4cCI6MjA3MjI0MzEwOX0.f9j3ExPfDIS3L_Jpg_kzxR-rXpJvTAPHpK6CzGsgOo0";
+  
+    // --- DOM ---
+    const emailEl      = document.getElementById("email");
+    const otpEl        = document.getElementById("otp");
+    const meEl         = document.getElementById("me");
+    const lbEl         = document.getElementById("lb");
+    const sendOtpBtn   = document.getElementById("sendOtp");
+    const verifyOtpBtn = document.getElementById("verifyOtp");
+    const gameFrame    = document.getElementById("gameFrame");
+  
+    // --- Supabase client ---
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.sb = sb;
+  
+    // --- Debug (overlay only if DEBUG === true) ---
+    const DEBUG = false;
+    function log(...a){
+      if (!DEBUG) return;
+      console.log("[SM]", ...a);
+      let box = document.getElementById("debug");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "debug";
+        box.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;max-height:36vh;overflow:auto;background:#0b1022dd;border:1px solid #284;padding:8px;border-radius:8px;font:12px/1.4 monospace;z-index:9999;color:#cfe";
+        box.innerHTML = "<b>Debug</b> — token & score flow logs";
+        document.body.appendChild(box);
+      }
+      const p = document.createElement("div");
+      p.textContent = a.map(String).join(" ");
+      box.appendChild(p);
+      box.scrollTop = box.scrollHeight;
     }
-
-    function synthClickAt(doc, x, y) {
-      const el = doc.elementFromPoint(x, y) || doc.body;
-      if (!el) return;
-      const evOpts = {bubbles:true, cancelable:true, clientX:x, clientY:y};
-      el.dispatchEvent(new MouseEvent("pointerdown", evOpts));
-      el.dispatchEvent(new MouseEvent("mousedown",    evOpts));
-      el.dispatchEvent(new MouseEvent("click",        evOpts));
-      el.dispatchEvent(new MouseEvent("mouseup",      evOpts));
-      el.dispatchEvent(new MouseEvent("pointerup",    evOpts));
+  
+    // --- Auth label ---
+    async function refreshUserLabel() {
+      const { data: { user } } = await sb.auth.getUser();
+      meEl.textContent = user ? `Signed in as ${user.email || user.id.slice(0,6)}…` : "Not signed in";
     }
-
-    function injectCSS(doc, css) {
-      const st = doc.createElement("style");
-      st.textContent = css;
-      (doc.head || doc.documentElement).appendChild(st);
+    await sb.auth.getSession().catch(()=>{});
+    await refreshUserLabel();
+    sb.auth.onAuthStateChange(() => { refreshUserLabel(); });
+  
+    // --- Email OTP flow ---
+    sendOtpBtn.onclick = async () => {
+      const email = emailEl.value.trim();
+      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+      alert(error ? error.message : "A 6-digit code was emailed to you.");
+    };
+    verifyOtpBtn.onclick = async () => {
+      const code = otpEl.value.trim();
+      if (!code) { await sb.auth.getSession().catch(()=>{}); await refreshUserLabel(); return; }
+      if (!/^\d{6}$/.test(code)) { alert("Enter the 6-digit code only, or leave blank."); return; }
+      const { error } = await sb.auth.verifyOtp({ email: emailEl.value.trim(), token: code, type: "email" });
+      if (error) alert(error.message);
+      await refreshUserLabel();
+    };
+  
+    // --- Leaderboard ---
+    async function loadBoard() {
+      const url = `${SUPABASE_URL}/rest/v1/leaderboard?select=user_id,best_score&order=best_score.desc&limit=10`;
+      const res = await fetch(url, {
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+      });
+      const rows = await res.json();
+      lbEl.innerHTML = "";
+      if (!rows.length) {
+        const li = document.createElement("li"); li.className="muted";
+        li.innerHTML = `<span>No scores yet — be the first!</span><strong>—</strong>`;
+        lbEl.appendChild(li);
+        return;
+      }
+      rows.forEach((r,i)=>{
+        const li = document.createElement("li");
+        const short = r.user_id.slice(0,8) + "…" + r.user_id.slice(-4);
+        li.innerHTML = `<span>#${i+1} ${short}</span><strong>${r.best_score}</strong>`;
+        lbEl.appendChild(li);
+      });
     }
-
-    function tryAutostart(doc) {
+    window.loadBoard = loadBoard;
+    loadBoard();
+  
+    // === SCORE FLOW ===
+    const MIN = 1.30; // must match DB trigger/validation
+    const tokenFrom = (d) => { if (Array.isArray(d)) d = d[0]; return d?.token ?? d?.id ?? d; };
+  
+    const G = { state:'IDLE', token:null, startAt:0, best:0, timer:null, lastStart:0 };
+    const reset = () => { G.state='IDLE'; G.token=null; G.startAt=0; G.best=0; if (G.timer){clearTimeout(G.timer); G.timer=null;} };
+  
+    async function onRunStart() {
+      const now = Date.now();
+      if (now - G.lastStart < 800) return; // debounce bursts
+      G.lastStart = now;
+      if (G.state !== 'IDLE') return;
+  
+      const { data:{ user } = {} } = await sb.auth.getUser();
+      if (!user) return log("Not signed in");
+  
+      const { data, error } = await sb.rpc("start_run");
+      if (error) { log("start_run error:", error.message || error); return; }
+  
+      G.token   = tokenFrom(data);
+      G.startAt = performance.now();
+      G.best    = 0;
+      G.state   = 'WAITING';
+      log("minted token", G.token);
+    }
+  
+    function onScore(n) {
+      if (G.state !== 'WAITING') return;
+      const s = Number(n) || 0;
+      if (s <= 0 || s <= G.best) return;
+      G.best = s;
+      if (G.timer) clearTimeout(G.timer);
+      G.timer = setTimeout(postNow, 250); // quiet period
+      log("best =", G.best);
+    }
+  
+    async function postNow() {
+      if (G.state !== 'WAITING' || !G.token || G.best <= 0) return;
+  
+      const { data:{ user } = {} } = await sb.auth.getUser();
+      if (!user) { reset(); return; }
+  
+      // anti-cheat: elapsed >= score × MIN
+      const elapsed  = (performance.now() - G.startAt) / 1000;
+      const required = G.best * MIN;
+      const waitMs   = Math.max(0, Math.ceil((required - elapsed) * 1000));
+      if (waitMs) { log("waiting", waitMs, "ms (anti-cheat)"); await new Promise(r=>setTimeout(r, waitMs)); }
+  
+      G.state = 'POSTING';
+      const { error } = await sb.from("scores").insert({ user_id: user.id, token: G.token, score: G.best });
+      if (error) { log("insert error:", error.message || error); reset(); return; }
+  
+      log("insert OK (score =", G.best, ")");
+      await loadBoard();
+      reset();
+    }
+  
+    // --- Listen for messages from the game (same-origin) ---
+    window.addEventListener("message", (e) => {
+      if (e.origin && e.origin !== location.origin) return;
+      const m = e.data;
+      if (!m || typeof m !== "object") return;
+      if (m.type === "RUN_START") onRunStart();
+      else if (m.type === "SCORE") onScore(m.score);
+    }, { capture: true });
+  
+    // --- Hook the iframe's console (parses game logs into messages) ---
+    function hookIframeConsole() {
+      const f = gameFrame?.contentWindow;
+      if (!f || f.__sm_console_hooked) return;
       try {
-        // 1) Click the typical run/start button
-        const runBtn = doc.getElementById("run") || doc.querySelector(".run, #start, .start, button");
-        if (runBtn) runBtn.click();
-
-        // 2) Kill splash/overlay hitboxes just in case they block taps
-        injectCSS(doc, `
-          .splash, #splash, .overlay, #overlay, .cover, #cover, .modal, [role="dialog"] {
-            pointer-events: none !important; opacity: 0 !important;
-          }
-          #run { position: relative !important; z-index: 9999 !important; }
-        `);
-
-        // 3) Try several synthetic clicks near the very top (where your device registers it)
-        const clickTop = () => {
-          // try a few x positions across the top strip
-          const W = doc.documentElement.clientWidth || 320;
-          const xs = [10, Math.floor(W/4), Math.floor(W/2), Math.floor(3*W/4), W-10];
-          const ys = [6, 12, 20, 28]; // tiny top band
-          ys.forEach(y => xs.forEach(x => synthClickAt(doc, x, y)));
+        f.__sm_console_hooked = true;
+        const origLog = f.console.log.bind(f.console);
+        f.console.log = function(...args) {
+          try {
+            for (const a of args) {
+              if (typeof a !== "string") continue;
+              if (a.startsWith("notify_run_start()")) {
+                top.postMessage({ type: "RUN_START" }, "*");
+              } else {
+                const m = a.match(/^notify_score\((\d+)\)/);
+                if (m) top.postMessage({ type: "SCORE", score: Number(m[1]) }, "*");
+              }
+            }
+          } catch {}
+          return origLog(...args);
         };
-
-        // 4) Also try Space / Enter (some templates bind these)
-        const pressKeys = () => { sendKey(doc, " "); sendKey(doc, "Enter"); };
-
-        // Run sequence a few times to catch late-mounted elements
-        clickTop(); pressKeys();
-        setTimeout(clickTop,   120);
-        setTimeout(pressKeys,  140);
-        setTimeout(clickTop,   260);
-        setTimeout(pressKeys,  280);
-
-        // Focus canvas if present
-        const canvas = doc.querySelector("canvas");
-        if (canvas && canvas.focus) canvas.focus();
+        log("iframe console hook active");
       } catch (e) {
-        console.warn("Autostart sequence error:", e);
+        console.warn("[SM] hook error:", e.message);
       }
     }
-
-    function startGame() {
-      gameArea.style.display = "flex";
-      if (!gameFrame.src.endsWith(GAME_URL)) gameFrame.src = GAME_URL;
-
-      gameFrame.addEventListener("load", () => {
-        const doc = gameFrame.contentDocument || gameFrame.contentWindow.document;
-        // Try immediately, then again shortly after in case template mounts late
-        tryAutostart(doc);
-        setTimeout(() => tryAutostart(doc), 300);
-        setTimeout(() => tryAutostart(doc), 600);
-      }, { once: true });
-
-      gameArea.scrollIntoView({ behavior: "smooth", block: "center" });
+  
+    // --- Also wrap iframe globals if they ever exist ---
+    function hookIframeGlobals() {
+      const f = gameFrame?.contentWindow;
+      if (!f) return;
+      const wrap = (name, handler) => {
+        try {
+          let fn = f[name];
+          if (typeof fn === "function" && !fn.__wrapped) {
+            const w = function(...a){ try{ handler(...a); }catch{} return fn.apply(this,a); };
+            w.__wrapped = true; f[name] = w; log("wrapped", name);
+          }
+          Object.defineProperty(f, name, {
+            configurable: true,
+            get(){ return fn; },
+            set(v){
+              if (typeof v === "function") {
+                fn = function(...a){ try{ handler(...a); }catch{} return v.apply(this,a); };
+                fn.__wrapped = true; log("wrapped future", name);
+              } else fn = v;
+            }
+          });
+        } catch {}
+      };
+      wrap("notify_run_start", () => onRunStart());
+      wrap("notify_score", (n) => onScore(n));
     }
-
-    playBtn.addEventListener("click", startGame);
-    playBtn.addEventListener("touchstart", (e) => { e.preventDefault(); startGame(); }, { passive: false });
-  </script>
+  
+    // Re-hook on iframe load
+    if (gameFrame) {
+      gameFrame.addEventListener("load", () => {
+        hookIframeConsole();
+        hookIframeGlobals();
+      });
+      // Load the game
+      gameFrame.src = "build/web/index.html";
+    } else {
+      console.warn("No <iframe id=\"gameFrame\"> found on the page.");
+    }
+  </script>    
 </body>
 </html>

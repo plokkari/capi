@@ -1,10 +1,92 @@
+# === imports ===
 import pygame
-import sys
-import random
-import time
-import math
-import string
-import os
+import sys, random, time, math, string, os
+import json as _json
+
+# =========================
+# --- Messaging hooks for Supabase leaderboard ---
+IS_WEB = (sys.platform == "emscripten")
+
+try:
+    import js
+except Exception:
+    js = None
+
+try:
+    import emscripten
+except Exception:
+    emscripten = None
+
+def _dbg_log(text: str):
+    if not IS_WEB:
+        return
+    try:
+        if js is not None:
+            js.console.log(str(text))
+        elif emscripten is not None:
+            emscripten.run_script(f"console.log({_json.dumps(str(text))})")
+    except Exception:
+        pass
+
+# --- robust postMessage helper (JSON -> plain JS object) ---
+def _post_to_parent(msg: dict):
+    if not IS_WEB:
+        return
+    try:
+        payload = _json.dumps(msg)  # JSON string
+    except Exception:
+        return
+
+    # Prefer direct js bridge
+    try:
+        js.window.top.postMessage(js.JSON.parse(payload), "*")
+        return
+    except Exception:
+        pass
+    try:
+        js.window.parent.postMessage(js.JSON.parse(payload), "*")
+        return
+    except Exception:
+        pass
+
+    # Fallback via emscripten (quote JSON string in JS)
+    if emscripten is not None:
+        try:
+            q = _json.dumps(payload)
+            emscripten.run_script(f"window.top.postMessage(JSON.parse({q}), '*')")
+            return
+        except Exception:
+            try:
+                emscripten.run_script(f"window.parent.postMessage(JSON.parse({q}), '*')")
+            except Exception:
+                pass
+# --- end helper ---
+
+_RUN_STARTED = False
+score_sent = False  # ensure SCORE is sent once per run
+
+def notify_run_start():
+    """Call once when the player starts a run (first tap/space)."""
+    global _RUN_STARTED
+    if not _RUN_STARTED:
+        _RUN_STARTED = True
+        _dbg_log("notify_run_start()")
+        _post_to_parent({"type": "RUN_START"})
+
+def notify_score(score: int):
+    """Call once on game over with the final score (int)."""
+    global score_sent
+    if score_sent:
+        return
+    score_sent = True
+    _dbg_log(f"notify_score({int(score)})")
+    _post_to_parent({"type": "SCORE", "score": int(score)})
+
+def reset_run_flag():
+    """Call when resetting to title/ready state."""
+    global _RUN_STARTED, score_sent
+    _RUN_STARTED = False
+    score_sent = False
 
 # =========================
 #  SETUP
@@ -231,7 +313,7 @@ capy_rect.center = (100, HEIGHT // 2)
 OBSTACLE_WIDTH = 60
 SCROLL_SPEED   = 150
 SPAWN_OFFSET_X = WIDTH + 60
-OBSTACLE_SPACING_X = 140   # phone-friendly spacing (was 130)
+OBSTACLE_SPACING_X = 150   # phone-friendly spacing (was 130)
 SPACING_JITTER = 15
 SPAWN_EDGE_GUARD = 40
 
@@ -314,7 +396,7 @@ def check_collision_single_column():
 # =========================
 #  HUMAN CHECK
 # =========================
-def next_challenge_increment(): return random.randint(5, 5)
+def next_challenge_increment(): return random.randint(10, 10)
 next_challenge_at = next_challenge_increment()
 
 # Bot-hardening config
@@ -527,12 +609,18 @@ def score_display(mode):
         SCREEN.blit(hs, (WIDTH//2 - hs.get_width()//2, HEIGHT//2))
 
 def reset_game():
+    try:
+        reset_run_flag()
+    except Exception:
+        pass
+    global score_sent
     global capy_movement, capy_y, score, obstacles, next_challenge_at, challenge, spawning_enabled, next_spacing_x, played_gameover_sound
     capy_rect.center = (100, HEIGHT // 2)
     capy_y = float(HEIGHT // 2)
     capy_movement = 0.0
     obstacles = []
     score = 0
+    score_sent = False
     next_challenge_at = next_challenge_increment()
     challenge["active"] = False
     challenge["typed"] = ""
@@ -612,6 +700,10 @@ while True:
             if game_state in ("start","ready"):
                 if event.key in (pygame.K_SPACE, pygame.K_RETURN):
                     maybe_start_music()
+                    try:
+                        notify_run_start()
+                    except Exception:
+                        pass
                     enter_play()
 
             elif game_state == "play":
@@ -656,6 +748,10 @@ while True:
 
             if game_state in ("start","ready"):
                 maybe_start_music()
+                try:
+                    notify_run_start()
+                except Exception:
+                    pass
                 enter_play()
             elif game_state == "play" and not paused_for_focus:
                 maybe_start_music()
@@ -697,6 +793,12 @@ while True:
 
         if not check_collision_single_column():
             game_state = "gameover"; gameover_time = time.time(); spawning_enabled = False
+            if not score_sent:
+                try:
+                    notify_score(score)
+                except Exception:
+                    pass
+                score_sent = True
             if SOUND_ENABLED and (not is_muted) and SFX_GAMEOVER:
                 if not played_gameover_sound:
                     try: SFX_GAMEOVER.play()
@@ -752,6 +854,12 @@ while True:
             game_state = "gameover"
             gameover_time = time.time()
             spawning_enabled = False
+            if not score_sent:
+                try:
+                    notify_score(score)
+                except Exception:
+                    pass
+                score_sent = True
             if SOUND_ENABLED and (not is_muted) and SFX_GAMEOVER:
                 if not played_gameover_sound:
                     try: SFX_GAMEOVER.play()
