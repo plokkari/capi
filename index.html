@@ -3,37 +3,92 @@
 <head>
   <meta charset="utf-8" />
   <title>PixCapy — Leaderboard</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <style>
     :root { --bg:#0f1220; --card:#171b2e; --ink:#e8ecff; --muted:#9aa3c7; --accent:#7cc8ff; }
     * { box-sizing:border-box; }
-    body { margin:0; font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink);
-           background:radial-gradient(1200px 800px at 10% -10%, #1a1f38 0%, var(--bg) 32%); }
+    body {
+      margin:0; font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink);
+      background:radial-gradient(1200px 800px at 10% -10%, #1a1f38 0%, var(--bg) 32%);
+    }
     header { padding:16px 20px; display:flex; align-items:center; gap:12px; }
     header h1 { margin:0; font-size:20px; font-weight:700; letter-spacing:.3px; }
     header .tag { font-size:12px; color:var(--muted); }
 
-    .wrap { display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:0 20px 20px; max-width:1200px; margin:0 auto; }
-    .card { background:var(--card); border:1px solid #243055; border-radius:14px; padding:14px;
-            box-shadow:0 12px 30px rgba(6,10,20,.25) inset, 0 1px 0 rgba(255,255,255,.04); }
+    /* --- Layout: desktop = 2 columns; mobile = stack with GAME first --- */
+    .wrap {
+      display:grid;
+      grid-template-columns: 360px 1fr;       /* left = auth+LB, right = game */
+      grid-template-areas: "left right";
+      gap:16px; padding:0 20px 20px; max-width:1200px; margin:0 auto;
+      align-items:start;
+    }
+    .left  { grid-area:left; }
+    .right { grid-area:right; }
+
+    .card {
+      background:var(--card); border:1px solid #243055; border-radius:14px; padding:14px;
+      box-shadow:0 12px 30px rgba(6,10,20,.25) inset, 0 1px 0 rgba(255,255,255,.04);
+    }
     .title { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
     .title h2 { margin:0; font-size:14px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
     .title small { color:var(--muted); }
     .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     input[type="email"], input[type="text"] {
-      background:#0c0f1e; color:var(--ink); border:1px solid #25335f; border-radius:10px; padding:10px 12px; flex:1 1 180px; outline:none;
+      background:#0c0f1e; color:var(--ink); border:1px solid #25335f; border-radius:10px; padding:10px 12px;
+      flex:1 1 180px; outline:none;
     }
-    button { appearance:none; border:1px solid #2c3a6b; background:linear-gradient(#1d2647,#0f1531);
-             color:#eaf2ff; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:600; }
+    button {
+      appearance:none; border:1px solid #2c3a6b; background:linear-gradient(#1d2647,#0f1531);
+      color:#eaf2ff; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:600;
+    }
     button:hover { border-color:#3b4c85; }
     .muted { color:var(--muted); }
     ul.lb { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
-    ul.lb li { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px;
-               background:#0c1023; border:1px solid #222f5a; border-radius:10px; }
+    ul.lb li {
+      display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px;
+      background:#0c1023; border:1px solid #222f5a; border-radius:10px;
+    }
     ul.lb li strong { font-variant-numeric: tabular-nums; }
-    .gameBox { display:flex; align-items:center; justify-content:center; min-height: 620px; }
-    iframe { width:420px; height:640px; border:1px solid #243055; border-radius:12px; background:#000; }
+
+    /* --- Game panel --- */
+    /* Center the game inside the card */
+.card.gameBox {
+  display: grid;           /* simpler than flex for centering one child */
+  place-items: center;     /* centers both horizontally & vertically */
+  min-height: 620px;
+}
+
+/* Center the iframe and keep 420x640 proportion without stretching */
+#gameFrame {
+  width: clamp(420px, 50vw, 640px); /* <- raise this last number to go even bigger (e.g., 640) */
+  aspect-ratio: 21 / 32;   /* keep the original proportions */
+  height: auto;            /* let aspect-ratio control height */
+  display: block;
+  margin: 0 auto;          /* explicit horizontal centering */
+  border: 1px solid #243055;
+  border-radius: 12px;
+  background: #000;
+}
+    #gameFrame { width:100%; height:100%; display:block; border:0; }
+
     .me { margin-top:6px; font-size:13px; color:var(--muted); }
+
+    /* --- Mobile: stack with GAME first, LB under --- */
+    @media (max-width: 900px) {
+      .wrap {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "right"  /* game first */
+          "left";  /* then auth + leaderboard */
+      }
+      .sidebar { position:static; max-height:none; }
+    }
+
+    /* (Optional) friendlier inputs on small screens */
+    @media (max-width: 480px) {
+      button, input { font-size:16px; }
+    }
   </style>
 </head>
 <body>
@@ -44,7 +99,7 @@
 
   <div class="wrap">
     <!-- LEFT: auth + leaderboard -->
-    <section class="card">
+    <section class="card left">
       <div class="title">
         <h2>Sign in</h2>
         <small id="me" class="me">Not signed in</small>
@@ -67,20 +122,50 @@
     </section>
 
     <!-- RIGHT: game -->
-    <section class="card gameBox">
-      <iframe id="gameFrame" title="PixCapy"></iframe>
+    <section class="card gameBox right">
+      <div class="game-frame">
+        <iframe id="gameFrame" title="PixCapy" allow="gamepad *; fullscreen *"></iframe>
+      </div>
     </section>
   </div>
 
   <!-- Supabase + game wiring -->
   <script type="module">
     import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-  
-    // --- Config ---
+
+    /* --- Debug helpers (single copy). Leave DEBUG=false for production. --- */
+    const DEBUG = false;
+    let __debugBox = null;
+    function ensureDebugBox() {
+      if (!DEBUG) return null;
+      if (!__debugBox) {
+        const box = document.createElement("div");
+        box.id = "debug";
+        box.style.cssText =
+          "position:fixed;left:8px;right:8px;bottom:8px;max-height:36vh;overflow:auto;background:#0b1022dd;border:1px solid #284;padding:8px;border-radius:8px;font:12px/1.4 monospace;z-index:9999;color:#cfe";
+        box.innerHTML = "<b>Debug</b> — token & score flow logs";
+        document.body.appendChild(box);
+        __debugBox = box;
+      }
+      return __debugBox;
+    }
+    function log(...args) {
+      if (!DEBUG) return;
+      const box = ensureDebugBox();
+      if (box) {
+        const p = document.createElement("div");
+        p.textContent = args.map(String).join(" ");
+        box.appendChild(p);
+        box.scrollTop = box.scrollHeight;
+      }
+      console.log("[SM]", ...args);
+    }
+
+    /* --- Config --- */
     const SUPABASE_URL = "https://bncmbgjnelhythdhsefk.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuY21iZ2puZWxoeXRoZGhzZWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NjcxMDksImV4cCI6MjA3MjI0MzEwOX0.f9j3ExPfDIS3L_Jpg_kzxR-rXpJvTAPHpK6CzGsgOo0";
-  
-    // --- DOM ---
+
+    /* --- DOM --- */
     const emailEl      = document.getElementById("email");
     const otpEl        = document.getElementById("otp");
     const meEl         = document.getElementById("me");
@@ -88,31 +173,12 @@
     const sendOtpBtn   = document.getElementById("sendOtp");
     const verifyOtpBtn = document.getElementById("verifyOtp");
     const gameFrame    = document.getElementById("gameFrame");
-  
-    // --- Supabase client ---
+
+    /* --- Supabase client --- */
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     window.sb = sb;
-  
-    // --- Debug (overlay only if DEBUG === true) ---
-    const DEBUG = false;
-    function log(...a){
-      if (!DEBUG) return;
-      console.log("[SM]", ...a);
-      let box = document.getElementById("debug");
-      if (!box) {
-        box = document.createElement("div");
-        box.id = "debug";
-        box.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;max-height:36vh;overflow:auto;background:#0b1022dd;border:1px solid #284;padding:8px;border-radius:8px;font:12px/1.4 monospace;z-index:9999;color:#cfe";
-        box.innerHTML = "<b>Debug</b> — token & score flow logs";
-        document.body.appendChild(box);
-      }
-      const p = document.createElement("div");
-      p.textContent = a.map(String).join(" ");
-      box.appendChild(p);
-      box.scrollTop = box.scrollHeight;
-    }
-  
-    // --- Auth label ---
+
+    /* --- Auth label --- */
     async function refreshUserLabel() {
       const { data: { user } } = await sb.auth.getUser();
       meEl.textContent = user ? `Signed in as ${user.email || user.id.slice(0,6)}…` : "Not signed in";
@@ -120,8 +186,8 @@
     await sb.auth.getSession().catch(()=>{});
     await refreshUserLabel();
     sb.auth.onAuthStateChange(() => { refreshUserLabel(); });
-  
-    // --- Email OTP flow ---
+
+    /* --- Email OTP flow --- */
     sendOtpBtn.onclick = async () => {
       const email = emailEl.value.trim();
       const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
@@ -135,8 +201,8 @@
       if (error) alert(error.message);
       await refreshUserLabel();
     };
-  
-    // --- Leaderboard ---
+
+    /* --- Leaderboard (unchanged logic) --- */
     async function loadBoard() {
       const url = `${SUPABASE_URL}/rest/v1/leaderboard?select=user_id,best_score&order=best_score.desc&limit=10`;
       const res = await fetch(url, {
@@ -159,33 +225,33 @@
     }
     window.loadBoard = loadBoard;
     loadBoard();
-  
-    // === SCORE FLOW ===
+
+    /* === SCORE FLOW === */
     const MIN = 1.30; // must match DB trigger/validation
     const tokenFrom = (d) => { if (Array.isArray(d)) d = d[0]; return d?.token ?? d?.id ?? d; };
-  
+
     const G = { state:'IDLE', token:null, startAt:0, best:0, timer:null, lastStart:0 };
     const reset = () => { G.state='IDLE'; G.token=null; G.startAt=0; G.best=0; if (G.timer){clearTimeout(G.timer); G.timer=null;} };
-  
+
     async function onRunStart() {
       const now = Date.now();
       if (now - G.lastStart < 800) return; // debounce bursts
       G.lastStart = now;
       if (G.state !== 'IDLE') return;
-  
+
       const { data:{ user } = {} } = await sb.auth.getUser();
       if (!user) return log("Not signed in");
-  
+
       const { data, error } = await sb.rpc("start_run");
       if (error) { log("start_run error:", error.message || error); return; }
-  
+
       G.token   = tokenFrom(data);
       G.startAt = performance.now();
       G.best    = 0;
       G.state   = 'WAITING';
       log("minted token", G.token);
     }
-  
+
     function onScore(n) {
       if (G.state !== 'WAITING') return;
       const s = Number(n) || 0;
@@ -195,29 +261,29 @@
       G.timer = setTimeout(postNow, 250); // quiet period
       log("best =", G.best);
     }
-  
+
     async function postNow() {
       if (G.state !== 'WAITING' || !G.token || G.best <= 0) return;
-  
+
       const { data:{ user } = {} } = await sb.auth.getUser();
       if (!user) { reset(); return; }
-  
+
       // anti-cheat: elapsed >= score × MIN
       const elapsed  = (performance.now() - G.startAt) / 1000;
       const required = G.best * MIN;
       const waitMs   = Math.max(0, Math.ceil((required - elapsed) * 1000));
       if (waitMs) { log("waiting", waitMs, "ms (anti-cheat)"); await new Promise(r=>setTimeout(r, waitMs)); }
-  
+
       G.state = 'POSTING';
       const { error } = await sb.from("scores").insert({ user_id: user.id, token: G.token, score: G.best });
       if (error) { log("insert error:", error.message || error); reset(); return; }
-  
+
       log("insert OK (score =", G.best, ")");
       await loadBoard();
       reset();
     }
-  
-    // --- Listen for messages from the game (same-origin) ---
+
+    // Messages from the game (same-origin)
     window.addEventListener("message", (e) => {
       if (e.origin && e.origin !== location.origin) return;
       const m = e.data;
@@ -225,8 +291,8 @@
       if (m.type === "RUN_START") onRunStart();
       else if (m.type === "SCORE") onScore(m.score);
     }, { capture: true });
-  
-    // --- Hook the iframe's console (parses game logs into messages) ---
+
+    // Hook iframe console to translate game logs → messages
     function hookIframeConsole() {
       const f = gameFrame?.contentWindow;
       if (!f || f.__sm_console_hooked) return;
@@ -252,8 +318,8 @@
         console.warn("[SM] hook error:", e.message);
       }
     }
-  
-    // --- Also wrap iframe globals if they ever exist ---
+
+    // Also wrap iframe globals if they ever exist
     function hookIframeGlobals() {
       const f = gameFrame?.contentWindow;
       if (!f) return;
@@ -279,18 +345,17 @@
       wrap("notify_run_start", () => onRunStart());
       wrap("notify_score", (n) => onScore(n));
     }
-  
-    // Re-hook on iframe load
+
+    // Re-hook on iframe load, then load the game
     if (gameFrame) {
       gameFrame.addEventListener("load", () => {
         hookIframeConsole();
         hookIframeGlobals();
       });
-      // Load the game
       gameFrame.src = "build/web/index.html";
     } else {
-      console.warn("No <iframe id=\"gameFrame\"> found on the page.");
+      console.warn('No <iframe id="gameFrame"> found on the page.');
     }
-  </script>    
+  </script>
 </body>
 </html>
