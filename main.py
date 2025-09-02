@@ -94,7 +94,7 @@ def reset_run_flag():
 pygame.init()
 WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Flappy Capy 🐹")
+pygame.display.set_caption("Flappy Bara 🐹")
 
 # =========================
 #  AUDIO & MUTE SETUP
@@ -396,7 +396,7 @@ def check_collision_single_column():
 # =========================
 #  HUMAN CHECK
 # =========================
-def next_challenge_increment(): return random.randint(10, 10)
+def next_challenge_increment(): return random.randint(25, 45)
 next_challenge_at = next_challenge_increment()
 
 # Bot-hardening config
