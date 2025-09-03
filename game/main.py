@@ -2,6 +2,8 @@
 import pygame
 import sys, random, time, math, string, os
 import json as _json
+from pathlib import Path
+from typing import Optional
 
 # =========================
 # --- Messaging hooks for Supabase leaderboard ---
@@ -122,6 +124,70 @@ MUSIC_BG = None  # background loop as Sound on web; None on desktop
 SFX_REWARD = None
 SFX_GAMEOVER = None
 
+# =========================
+#  ASSET HELPERS (new)
+# =========================
+BASE    = Path(__file__).parent          # /game
+ASSETS  = BASE / "assets"
+IMG_DIRS = [ASSETS / "imgs", ASSETS / "img", ASSETS]
+SND_DIRS = [ASSETS / "sound", ASSETS / "audio", ASSETS]
+
+def _resolve_path(name: str, dirs: list[Path]) -> Path:
+    """
+    Find 'name' by checking:
+      1) absolute path
+      2) BASE/name
+      3) each dir / basename
+      4) current working directory (legacy)
+    """
+    p = Path(name)
+    if p.is_absolute() and p.exists():
+        return p
+    # direct relative to the game folder
+    cand = BASE / p
+    if cand.exists():
+        return cand
+    # search within preferred asset dirs (use just the filename)
+    for d in dirs:
+        q = d / p.name
+        if q.exists():
+            return q
+    # legacy: whatever the process CWD is
+    if p.exists():
+        return p
+    raise FileNotFoundError(f"Asset not found: {name} (searched: {', '.join(map(str, dirs))})")
+
+def load_img(name: str) -> pygame.Surface:
+    path = _resolve_path(name, IMG_DIRS)
+    return pygame.image.load(str(path)).convert_alpha()
+
+def _first_existing_sound(basename: str, exts: tuple[str, ...]) -> Optional[str]:
+    """
+    Return the first existing path for 'basename' among exts, searching
+    BASE and SND_DIRS. Example: basename='music_loop', exts=('.wav','.ogg')
+    """
+    # if caller passed a full filename with extension, respect it
+    base_path = Path(basename)
+    if base_path.suffix:
+        try:
+            return str(_resolve_path(basename, SND_DIRS))
+        except FileNotFoundError:
+            return None
+
+    # try BASE then each SND_DIR with each extension
+    search_dirs = [BASE] + SND_DIRS
+    for d in search_dirs:
+        for ext in exts:
+            cand = d / f"{basename}{ext}"
+            if cand.exists():
+                return str(cand)
+    # last chance: process CWD
+    for ext in exts:
+        cand = Path(f"{basename}{ext}")
+        if cand.exists():
+            return str(cand)
+    return None
+
 def _apply_mute_state():
     if not SOUND_ENABLED:
         return
@@ -141,14 +207,6 @@ def _apply_mute_state():
         if SFX_GAMEOVER: SFX_GAMEOVER.set_volume(sfx_vol)
     except Exception:
         pass
-
-def _first_existing_sound(basename, exts):
-    """Return the first existing path for basename among given extensions."""
-    for ext in exts:
-        p = basename + ext
-        if os.path.exists(p):
-            return p
-    return None
 
 def load_audio_assets():
     """(Re)load all audio assets after mixer init. Keeps globals up to date."""
@@ -297,12 +355,12 @@ def try_flap():
         last_flap_time = t
 
 # =========================
-#  ASSETS
+#  ASSETS (uses new helpers)
 # =========================
-background_img = pygame.image.load("capy back.png").convert()
+background_img = load_img("capy back.png").convert()
 background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
 
-capy_img = pygame.image.load("flappy capy.png").convert_alpha()
+capy_img = load_img("flappy capy.png")
 capy_img = pygame.transform.scale(capy_img, (60, 45))
 capy_rect = pygame.Rect(0, 0, 40, 30)
 capy_rect.center = (100, HEIGHT // 2)
