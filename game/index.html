@@ -55,6 +55,13 @@
     }
     ul.lb li strong { font-variant-numeric: tabular-nums; }
 
+    /* Leaderboard "you" styling + small line above the list */
+    #lb li.me{outline:2px solid #48a3ff;border-radius:8px}
+    #lb li .you{margin-left:.4ch;font-weight:600;color:#8fd0ff}
+    .meBest{margin:6px 0 10px;color:var(--muted);font-size:13px}
+    .meBest strong{color:var(--ink)}
+    .meBest .rank{color:var(--accent);font-weight:600;margin-left:.3ch}
+
     /* --- Game panel --- */
     .card.gameBox { display:grid; place-items:center; position:relative; padding:14px; }
     /* DESKTOP: keep game at 420px wide (≈640px tall). MOBILE: scale down but never exceed 420px */
@@ -97,6 +104,7 @@
       #gameFrame { width: min(92vw, 420px); }
     }
     @media (max-width: 480px) { button, input { font-size:16px; } }
+    
   </style>
 </head>
 <body>
@@ -124,6 +132,7 @@
       <div class="title" style="margin-top:12px">
         <h2>Top 10</h2>
       </div>
+      <div id="myBest" class="meBest">Sign in to see your best & rank</div>
       <ul id="lb" class="lb">
         <li class="muted"><span>No scores yet — be the first!</span><strong>—</strong></li>
       </ul>
@@ -232,31 +241,47 @@
       await refreshUserLabel();
     };
   
-    /* --- Leaderboard --- */
-    async function loadBoard() {
-  // who am I?
+   // --- Leaderboard helpers ---
+const headers = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+};
+
+// robust id compare (case-insensitive, ignore dashes)
+const sameId = (a,b) => {
+  const norm = x => (x ?? "").toString().trim().toLowerCase().replace(/-/g,"");
+  return norm(a) === norm(b);
+};
+
+// count how many players have best_score > given score
+async function countGreaterThan(score) {
+  const url = `${SUPABASE_URL}/rest/v1/leaderboard?select=best_score&best_score=gt.${encodeURIComponent(score)}`;
+  const r = await fetch(url, { headers: { ...headers, Prefer: "count=exact", Range: "0-0" } });
+
+  // Prefer header total (e.g., "0-0/123")
+  const cr = r.headers.get("content-range") || "";
+  const m = /\/(\d+)$/.exec(cr);
+  if (m) return parseInt(m[1], 10);
+
+  // Fallback to body length if header missing
+  try { const arr = await r.json(); return Array.isArray(arr) ? arr.length : 0; }
+  catch { return 0; }
+}
+
+// --- Leaderboard renderer ---
+async function loadBoard() {
   const { data: { user } } = await sb.auth.getUser();
   const meId = (user?.id ?? "").toString().trim().toLowerCase();
+  const myBestBox = document.getElementById('myBest');
 
-  const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  if (!meId && myBestBox) myBestBox.textContent = 'Sign in to see your best & rank';
 
-  // top 10
+  // Top 10
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/leaderboard?select=user_id,best_score&order=best_score.desc&limit=10`,
     { headers }
   );
   const rows = await res.json();
-
-  // also fetch my own best (fallback row if I'm not in top 10)
-  let myBest = null;
-  if (meId) {
-    const meRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/leaderboard?select=user_id,best_score&user_id=eq.${meId}`,
-      { headers }
-    );
-    const meRows = await meRes.json();
-    myBest = meRows?.[0] || null;
-  }
 
   lbEl.innerHTML = "";
   if (!rows.length) {
@@ -266,38 +291,60 @@
     return;
   }
 
-  // robust id compare (case-insensitive, ignore dashes)
-  const sameId = (a, b) => {
-    const norm = (x) => (x ?? "").toString().trim().toLowerCase().replace(/-/g, "");
-    return norm(a) === norm(b);
-  };
-
   let meShown = false;
 
   rows.forEach((r, i) => {
     const li = document.createElement("li");
-    const isMe = meId && sameId(r.user_id, meId);
     const uid = String(r.user_id);
-    const short = uid.slice(0, 8) + "…" + uid.slice(-4);
+    const short = uid.slice(0,8) + "…" + uid.slice(-4);
+    const isMe = meId && sameId(uid, meId);
 
     li.innerHTML =
-      `<span>#${i + 1} ${short}${isMe ? ' <span class="you">(you)</span>' : ''}</span>` +
+      `<span>#${i+1} ${short}${isMe ? ' <span class="you">(you)</span>' : ''}</span>` +
       `<strong>${r.best_score}</strong>`;
 
     if (isMe) { li.classList.add("me"); meShown = true; }
     lbEl.appendChild(li);
   });
 
-  // If I'm not in top 10, show my own row at the bottom
-  if (meId && !meShown) {
-    const li = document.createElement("li");
-    li.className = "me";
-    const shortMe = meId.slice(0, 8) + "…" + meId.slice(-4);
-    const score = myBest?.best_score ?? "—";
-    li.innerHTML = `<span>Your best ${shortMe} <span class="you">(you)</span></span><strong>${score}</strong>`;
-    lbEl.appendChild(li);
+  // Your best + rank (even if not in top 10)
+  if (meId) {
+    // fetch my best
+    const meRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/leaderboard?select=user_id,best_score&user_id=eq.${meId}`,
+      { headers }
+    );
+    const meRows = await meRes.json();
+    const myBest = meRows?.[0] || null;
+
+    let myRank = null;
+    if (myBest && Number.isFinite(Number(myBest.best_score))) {
+      const totalGt = await countGreaterThan(myBest.best_score);
+      myRank = (totalGt || 0) + 1;
+    }
+
+    if (myBestBox) {
+      if (myBest) {
+        myBestBox.innerHTML = `Your best: <strong>${myBest.best_score}</strong> <span class="rank">(rank ${myRank ?? "—"})</span>`;
+      } else {
+        myBestBox.innerHTML = `Your best: <strong>—</strong>`;
+      }
+    }
+
+    // If I'm not in top-10, append my own row
+    if (!meShown) {
+      const li = document.createElement("li");
+      li.className = "me";
+      const shortMe = meId.slice(0,8) + "…" + meId.slice(-4);
+      li.innerHTML = `<span>Your best ${shortMe} <span class="you">(you)</span></span><strong>${myBest?.best_score ?? "—"}</strong>`;
+      lbEl.appendChild(li);
+    }
   }
 }
+
+// Call once on load, and also on auth state changes:
+window.loadBoard = loadBoard;
+
     
     window.loadBoard = loadBoard;
     loadBoard();
