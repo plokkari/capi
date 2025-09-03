@@ -7,17 +7,13 @@ from typing import Optional
 
 # =========================
 # --- Messaging hooks for Supabase leaderboard ---
+import sys
 IS_WEB = (sys.platform == "emscripten")
-
 try:
     import js
 except Exception:
     js = None
 
-try:
-    import emscripten
-except Exception:
-    emscripten = None
 
 def _dbg_log(text: str):
     if not IS_WEB:
@@ -62,7 +58,35 @@ def _post_to_parent(msg: dict):
                 emscripten.run_script(f"window.parent.postMessage(JSON.parse({q}), '*')")
             except Exception:
                 pass
-# --- end helper ---
+
+# --- sync "my real best" from parent / localStorage into high_score ---
+def _poll_parent_best():
+    if not IS_WEB or js is None:
+        return
+    v = None
+    # 1) direct bridge variable
+    try:
+        v = js.window.__sm_my_best
+    except Exception:
+        v = None
+    # 2) fallback: localStorage
+    if v in (None, 0, "0"):
+        try:
+            s = js.window.localStorage.getItem("sm_my_best")
+            if s is not None:
+                v = int(s)
+        except Exception:
+            v = None
+    # 3) apply if higher
+    try:
+        if v is not None:
+            v = int(v)
+            global high_score
+            if v > high_score:
+                high_score = v
+    except Exception:
+        pass
+
 
 _RUN_STARTED = False
 score_sent = False  # ensure SCORE is sent once per run
@@ -341,6 +365,9 @@ score = 0
 high_score = 0
 gameover_time = 0
 played_gameover_sound = False
+
+# NEW: pull best from parent once at boot (if available)
+_poll_parent_best()
 
 # --- HARDEN: flap rate limit ---
 MAX_FLAPS_PER_SEC = 12.0
@@ -728,8 +755,9 @@ while True:
     now = time.perf_counter()
     dt = now - last_time
     last_time = now
-    # Cap only big pauses (tab switches), not normal low FPS
     dt = max(0.0, min(dt, 0.10))
+    # NEW: keep high_score synced from parent (Supabase value)
+    _poll_parent_best()
     game_active = (game_state == "play")
     paused_for_focus = game_active and (not pygame.display.get_active())
 
