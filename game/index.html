@@ -240,6 +240,20 @@
       if (error) alert(error.message);
       await refreshUserLabel();
     };
+
+    // --- Push my best score into the game iframe -------------------------------
+    /* --- bridge: send my real best into the game iframe --- */
+let lastMyBest = null;           // <-- REQUIRED declaration
+
+function setMyBestInGame(best) {
+  lastMyBest = Number(best) || 0;
+  const f = gameFrame?.contentWindow;
+  try { if (f) f.__sm_my_best = lastMyBest; } catch {}
+  try { localStorage.setItem('sm_my_best', String(lastMyBest)); } catch {}
+  try { if (f) f.postMessage({ type: "SET_MY_BEST", best: lastMyBest }, "*"); } catch {}
+}
+
+
   
    // --- Leaderboard helpers ---
 const headers = {
@@ -321,6 +335,7 @@ async function loadBoard() {
     if (myBest && Number.isFinite(Number(myBest.best_score))) {
       const totalGt = await countGreaterThan(myBest.best_score);
       myRank = (totalGt || 0) + 1;
+      setMyBestInGame(myBest.best_score);
     }
 
     if (myBestBox) {
@@ -544,6 +559,8 @@ window.loadBoard = loadBoard;
         const tick = () => {
           if (tryAutoStartIframe()) return;
           if (performance.now() - t0 < 2000) requestAnimationFrame(tick);
+          // if we already know the best when the iframe finishes loading, push it in
+          if (lastMyBest != null) setMyBestInGame(lastMyBest);
         };
         tick();
       });
