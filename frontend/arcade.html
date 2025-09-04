@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>$Bara — Arcade</title>
+  <link rel="stylesheet" href="/assets/css/style.css" />
+  <script defer src="https://unpkg.com/swup@4"></script>
+  <script defer src="/assets/js/app.js"></script>
+</head>
+<body>
+  <canvas class="stars"></canvas>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="logo" href="/index.html#home">🟣 <span>$Bara</span></a>
+      <div class="pill-nav">
+        <a class="pill" href="/index.html#home">Home</a>
+        <a class="pill" href="/about.html">About</a>
+        <a class="pill active" href="#arcade">Arcade</a>
+        <a class="pill" href="/how-to-buy.html">How to Buy</a>
+        <a class="pill" href="/faq.html">FAQ</a>
+      </div>
+      <a class="cta" href="#" onclick="alert('Buy link coming soon')">Buy $BARA</a>
+    </div>
+  </nav>
+
+  <div id="swup" class="transition-fade">
+    <main>
+      <section id="arcade" class="reveal">
+        <h2 class="section-title">Arcade</h2>
+        <div class="card">
+          <div class="carousel">
+            <div class="game">
+              <div class="thumb"></div>
+              <h4>Flappybara 🐹</h4>
+              <p class="muted">Tap to dodge. Weekly prizes.</p>
+              <button class="play" onclick="alert('Open Flappybara')">Play</button>
+            </div>
+            <div class="game">
+              <div class="thumb"></div>
+              <h4>Capy Dash</h4>
+              <p class="muted">Endless runner prototype.</p>
+              <button class="play" onclick="alert('Coming soon')">Preview</button>
+            </div>
+            <div class="game">
+              <div class="thumb"></div>
+              <h4>Bararena</h4>
+              <p class="muted">1v1 mini-duels.</p>
+              <button class="play" onclick="alert('Coming soon')">Preview</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer>© 2025 $Bara • Arcade that pays to play</footer>
+  </div>
+</body>
+</html>

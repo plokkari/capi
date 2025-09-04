@@ -1,0 +1,221 @@
+<<<<<<< HEAD
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>$Bara — Arcade memecoin</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="assets/css/style.css" />
+
+  <!-- Libs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script defer src="https://unpkg.com/swup@4"></script>
+
+  <!-- App -->
+  <script defer src="assets/js/app.js"></script>
+</head>
+<body>
+  <!-- starfield backdrop -->
+  <canvas class="stars"></canvas>
+
+  <!-- LOADER -->
+  <div id="loader" class="loader">
+    <div class="load-card">
+      <img class="load-gif" src="assets/img/loader.gif" alt="Loading..." />
+      <div class="load-bar">
+        <div class="load-fill" id="loadFill"></div>
+      </div>
+      <div class="load-text" id="loadText">ALMOST READY…</div>
+      <div class="load-tip" id="loadTip" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="logo" href="index.html#home">🟣 <span>$Bara</span></a>
+
+      <!-- centered tabs -->
+      <div class="pill-nav">
+        <a class="pill active" href="#home">Home</a>
+        <a class="pill" href="about.html">About</a>
+        <a class="pill" href="arcade.html">Arcade</a>
+        <a class="pill" href="how-to-buy.html">How to Buy</a>
+        <a class="pill" href="faq.html">FAQ</a>
+      </div>
+
+      <a class="cta" href="#" onclick="alert('Buy link coming soon')">Buy $BARA</a>
+    </div>
+  </nav>
+
+  <!-- Swup page container -->
+  <div id="swup" class="transition-fade">
+    <main id="home">
+      <!-- SCENE 1: HERO -->
+      <section class="scene hero-scene" id="homeSection">
+        <div class="container">
+          <div class="hero-grid reveal">
+            <!-- Left card -->
+            <div class="card">
+              <h1 class="headline">Welcome to <span class="accent">Bara</span></h1>
+              <p class="muted">Arcade-first memecoin. Clean vibes, crispy games, and a community that actually plays.</p>
+
+              <div class="badges">
+                <div class="badge">Ticker: <b>$BARA</b></div>
+                <div class="badge">Chain: <b>Solana</b></div>
+                <div class="badge">Supply: <b>1,000,000,000</b></div>
+                <div class="badge">Tax: <b>0% / 0%</b></div>
+              </div>
+
+              <div class="cta-row">
+                <a class="btn primary" href="#arcade">Enter Arcade</a>
+                <a class="btn" href="#" onclick="alert('DEX link coming soon')">Buy $BARA</a>
+              </div>
+            </div>
+
+            <!-- Right card: Meme chart -->
+            <div class="card hero-art">
+              <div class="chart-head">
+                <div class="chip live">LIVE</div>
+                <div class="chip sym">$BARA</div>
+                <div class="spacer"></div>
+                <button class="chip tf" data-speed="0.5">24h</button>
+                <button class="chip tf active" data-speed="1.0">7d</button>
+                <button class="chip tf" data-speed="1.8">1m</button>
+              </div>
+
+              <div class="chart-wrap">
+                <canvas id="memeChart"></canvas>
+              </div>
+
+              <div class="chart-foot">
+                <div class="price" id="memePrice">$0.000000</div>
+                <div class="delta up" id="memeDelta">+0.0%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlaid GET $BARA image (behind cards, clipped at section bottom) -->
+        <img id="getBara" class="hero-floater" src="assets/img/get-bara.png" alt="GET $BARA" />
+      </section>
+
+      <!-- SCENE 2: ABOUT -->
+      <section class="scene" id="about">
+        <div class="container reveal">
+          <h2 class="section-title">About $Bara</h2>
+          <div class="about">
+            <div class="page">
+              <h3>Game-Powered Token</h3>
+              <p class="muted">Weekly leaderboards pay out $BARA + partner tokens. Easy to play, hard to master.</p>
+            </div>
+            <div class="page">
+              <h3>Arcade Roadmap</h3>
+              <p class="muted">Flappybara → Endless runner → PVP mini-duels. Seasonal events, NFT cosmetics, and cross-game boards.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 3: ARCADE -->
+      <section class="scene" id="arcade">
+        <div class="container reveal">
+          <h2 class="section-title">Arcade</h2>
+          <div class="card">
+            <div class="carousel">
+              <div class="game">
+                <div class="thumb"></div>
+                <h4>Flappybara 🐹</h4>
+                <p class="muted">Tap to dodge. Weekly prizes.</p>
+                <button class="play" onclick="alert('Open Flappybara')">Play</button>
+              </div>
+              <div class="game">
+                <div class="thumb"></div>
+                <h4>Capy Dash</h4>
+                <p class="muted">Endless runner prototype.</p>
+                <button class="play" onclick="alert('Coming soon')">Preview</button>
+              </div>
+              <div class="game">
+                <div class="thumb"></div>
+                <h4>Bararena</h4>
+                <p class="muted">1v1 mini-duels.</p>
+                <button class="play" onclick="alert('Coming soon')">Preview</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 4: HOW TO BUY -->
+      <section class="scene" id="how">
+        <div class="container reveal">
+          <h2 class="section-title">How to Buy</h2>
+          <div class="steps">
+            <div class="step"><b>1) Get a Wallet</b><br><span class="muted">Phantom or Backpack on Solana.</span></div>
+            <div class="step"><b>2) Fund with SOL</b><br><span class="muted">On-ramp or CEX → send to wallet.</span></div>
+            <div class="step"><b>3) Swap for $BARA</b><br><span class="muted">Use our quick swap (soon) or Jupiter.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 5: FAQ -->
+      <section class="scene" id="faq">
+        <div class="container reveal">
+          <h2 class="section-title">FAQ</h2>
+          <div class="faq">
+            <details class="item">
+              <summary>Is the contract renounced / taxes?</summary>
+              <div class="content">0% / 0% taxes. Contract & LP details will be posted at launch.</div>
+            </details>
+            <details class="item">
+              <summary>How do leaderboard rewards work?</summary>
+              <div class="content">Weekly snapshots. Top ranks split a prize pool in $BARA + partner tokens. Anti-bot checks included.</div>
+            </details>
+            <details class="item">
+              <summary>Will there be NFTs?</summary>
+              <div class="content">Yes—cosmetic skins + early access perks. No pay-to-win.</div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 6: SOCIALS (tighter) -->
+      <section class="scene scene-tight" id="socials">
+        <div class="container reveal socials">
+          <h2 class="section-title">Socials</h2>
+          <div class="ring">
+            <a class="icon" style="--i:0" href="#" title="X">X</a>
+            <a class="icon" style="--i:1" href="#" title="Telegram">TG</a>
+            <a class="icon" style="--i:2" href="#" title="Discord">DC</a>
+            <a class="icon" style="--i:3" href="#" title="YouTube">YT</a>
+            <a class="icon" style="--i:4" href="#" title="Spotify">SP</a>
+            <a class="icon" style="--i:5" href="#" title="Instagram">IG</a>
+            <a class="icon" style="--i:6" href="#" title="Website">WB</a>
+            <a class="icon" style="--i:7" href="#" title="GitHub">GH</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>© 2025 $Bara • Arcade that pays to play</footer>
+  </div>
+=======
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Redirecting…</title>
+  <link rel="canonical" href="https://www.baracoin.xyz/game/">
+  <meta http-equiv="refresh" content="0; url=https://www.baracoin.xyz/game/">
+  <script>
+    // Force the www host and preserve query/hash
+    location.replace('https://www.baracoin.xyz/game/' + location.search + location.hash);
+  </script>
+</head>
+<body>
+  <p>Redirecting to <a href="https://www.baracoin.xyz/game/">https://www.baracoin.xyz/game/</a>…</p>
+>>>>>>> e2e2d1e2e56ca8a22f6001053e5a41753748a985
+</body>
+</html>
