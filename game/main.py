@@ -331,22 +331,49 @@ MUTE_BTN_SIZE = 36
 mute_button_rect = pygame.Rect(WIDTH - MUTE_BTN_SIZE - 10, 10, MUTE_BTN_SIZE, MUTE_BTN_SIZE)
 
 def draw_mute_button():
-    pygame.draw.rect(SCREEN, (0,0,0), mute_button_rect, border_radius=8)
-    pygame.draw.rect(SCREEN, (220,220,220), mute_button_rect, width=2, border_radius=8)
-    pad = 8
-    x, y, w, h = mute_button_rect
-    inner = pygame.Rect(x+pad, y+pad, w-2*pad, h-2*pad)
-    head = pygame.Rect(inner.x, inner.y, inner.w, int(inner.h*0.55))
-    pygame.draw.ellipse(SCREEN, (255,255,255), head, width=2)
-    stem_h = int(inner.h*0.3)
-    stem_y = head.bottom - 2
-    stem = pygame.Rect(inner.centerx-3, stem_y, 6, stem_h)
-    pygame.draw.rect(SCREEN, (255,255,255), stem, width=2)
-    base_w = int(inner.w*0.6)
-    base_rect = pygame.Rect(inner.centerx - base_w//2, stem.bottom-1, base_w, 3)
-    pygame.draw.rect(SCREEN, (255,255,255), base_rect)
+    """Text button that says MUTE; when muted, draw a red slash across it."""
+    r = mute_button_rect
+
+    # Button chrome
+    pygame.draw.rect(SCREEN, (0, 0, 0), r, border_radius=8)
+    pygame.draw.rect(SCREEN, (220, 220, 220), r, width=2, border_radius=8)
+
+    # Inner area for the text
+    pad_x, pad_y = 6, 4
+    inner = r.inflate(-2 * pad_x, -2 * pad_y)
+
+    label = "MUTE"
+    # Find the largest font that fits in the inner rect
+    lo, hi = 8, max(12, inner.h)  # reasonable bounds
+    best = lo
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        f = pygame.font.SysFont("Arial", mid, bold=True)
+        w, h = f.size(label)
+        if w <= inner.w and h <= inner.h:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+
+    # Render label (slightly dim if muted)
+    f = pygame.font.SysFont("Arial", best, bold=True)
+    col = (240, 240, 240) if not is_muted else (210, 210, 210)
+    txt = f.render(label, True, col)
+    SCREEN.blit(txt, (r.centerx - txt.get_width() // 2,
+                      r.centery - txt.get_height() // 2))
+
+    # Red slash when muted
     if is_muted:
-        pygame.draw.line(SCREEN, (230,60,60), (x+6, y+6), (x+w-6, y+h-6), 4)
+        sw = max(3, r.w // 10)
+        pygame.draw.line(
+            SCREEN, (230, 60, 60),
+            (r.left + 6, r.bottom - 6),   # bottom-left inside the border
+            (r.right - 6, r.top + 6),     # top-right inside the border
+            sw
+        )
+
+
 
 def _point_in(rect, pos): return rect.collidepoint(pos)
 
@@ -804,7 +831,7 @@ while True:
                         challenge["typed"] = challenge["typed"][:-1]
 
             elif game_state == "gameover":
-                if time.time() - gameover_time > 1 and event.key == pygame.K_r:
+                if ttime.time() - gameover_time > 1 and event.key in (pygame.K_r, pygame.K_SPACE):
                     reset_game(); game_state = "ready"
 
         # TEXTINPUT: soft keyboard characters for mobile / desktop IME
