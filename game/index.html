@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "227baeece0c24c959606461ae7de2c97"}'></script><!-- End Cloudflare Web Analytics -->
+  <meta charset="utf-8" />
+  <title>Flappy Bara — Leaderboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <style>
+    :root { --bg:#0f1220; --card:#171b2e; --ink:#e8ecff; --muted:#9aa3c7; --accent:#7cc8ff; }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink);
+      background:radial-gradient(1200px 800px at 10% -10%, #1a1f38 0%, var(--bg) 32%);
+    }
+    header { padding:16px 20px; display:flex; align-items:center; gap:12px; }
+    header h1 { margin:0; font-size:20px; font-weight:700; letter-spacing:.3px; }
+    header .tag { font-size:12px; color:var(--muted); }
+    
+    #lb li.me { outline: 2px solid #48a3ff; border-radius: 8px; }
+#lb li .you { margin-left: .4ch; font-weight: 600; color: #8fd0ff; }
+
+    /* --- Layout: desktop = 2 columns; mobile = stack with GAME first --- */
+    .wrap {
+      display:grid;
+      grid-template-columns: 360px 1fr;       /* left = auth+LB, right = game */
+      grid-template-areas: "left right";
+      gap:16px; padding:0 20px 20px; max-width:1200px; margin:0 auto;
+      align-items:start;
+    }
+    .left  { grid-area:left; }
+    .right { grid-area:right; }
+
+    .card {
+      background:var(--card); border:1px solid #243055; border-radius:14px; padding:14px;
+      box-shadow:0 12px 30px rgba(6,10,20,.25) inset, 0 1px 0 rgba(255,255,255,.04);
+    }
+    .title { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .title h2 { margin:0; font-size:14px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
+    .title small { color:var(--muted); }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    input[type="email"], input[type="text"] {
+      background:#0c0f1e; color:var(--ink); border:1px solid #25335f; border-radius:10px; padding:10px 12px;
+      flex:1 1 180px; outline:none;
+    }
+    button {
+      appearance:none; border:1px solid #2c3a6b; background:linear-gradient(#1d2647,#0f1531);
+      color:#eaf2ff; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:600;
+    }
+    button:hover { border-color:#3b4c85; }
+    .muted { color:var(--muted); }
+    ul.lb { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+    ul.lb li {
+      display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px;
+      background:#0c1023; border:1px solid #222f5a; border-radius:10px;
+    }
+    ul.lb li strong { font-variant-numeric: tabular-nums; }
+
+    /* Leaderboard "you" styling + small line above the list */
+    #lb li.me{outline:2px solid #48a3ff;border-radius:8px}
+    #lb li .you{margin-left:.4ch;font-weight:600;color:#8fd0ff}
+    .meBest{margin:6px 0 10px;color:var(--muted);font-size:13px}
+    .meBest strong{color:var(--ink)}
+    .meBest .rank{color:var(--accent);font-weight:600;margin-left:.3ch}
+
+    /* --- Game panel --- */
+    .card.gameBox { display:grid; place-items:center; position:relative; padding:14px; }
+    /* DESKTOP: keep game at 420px wide (≈640px tall). MOBILE: scale down but never exceed 420px */
+    #gameFrame {
+      width: 420px;
+      max-width: 100%;
+      aspect-ratio: 21 / 32;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #243055;
+      border-radius: 12px;
+      background: #000;
+    }
+
+    /* Tap-to-start overlay that does NOT block pointer events (pass-through) */
+    .tapOverlay {
+      position:absolute; inset:12px;
+      display:none; place-items:center;
+      border-radius:12px;
+      border:1px dashed rgba(124,200,255,.55);
+      background:linear-gradient(180deg, rgba(8,14,28,.30), rgba(8,14,28,.10));
+      color:#dbe9ff;
+      font-weight:700;
+      text-shadow:0 1px 0 rgba(0,0,0,.5);
+      pointer-events:none;                /* let taps go through to the iframe */
+      transition: opacity .2s ease;
+    }
+    .tapOverlay.show { display:grid; }
+    .tapOverlay.fade { opacity:0; }
+
+    .me { margin-top:6px; font-size:13px; color:var(--muted); }
+
+    /* --- Mobile: stack with GAME first, LB under --- */
+    @media (max-width: 900px) {
+      .wrap {
+        grid-template-columns: 1fr;
+        grid-template-areas: "right" "left";
+      }
+      #gameFrame { width: min(92vw, 420px); }
+    }
+    @media (max-width: 480px) { button, input { font-size:16px; } }
+    
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Flappy Bara</h1>
+    <span class="tag">scoreboard + game</span>
+  </header>
+
+  <div class="wrap">
+    <!-- LEFT: auth + leaderboard -->
+    <section class="card left">
+      <div class="title">
+        <h2>Sign in</h2>
+        <small id="me" class="me">Not signed in</small>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <input id="email" type="email" placeholder="you@email.com" />
+        <button id="sendOtp" type="button">Send link</button>
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <input id="otp" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="(optional) 6-digit code" />
+        <button id="verifyOtp" type="button">Verify</button>
+      </div>
+
+      <div class="title" style="margin-top:12px">
+        <h2>Top 10</h2>
+      </div>
+      <div id="myBest" class="meBest">Sign in to see your best & rank</div>
+      <ul id="lb" class="lb">
+        <li class="muted"><span>No scores yet — be the first!</span><strong>—</strong></li>
+      </ul>
+    </section>
+
+    <!-- RIGHT: game -->
+    <section class="card gameBox right">
+      <!-- pass-through overlay appears on touch devices -->
+      <div id="tapOverlay" class="tapOverlay">
+      </div>
+      <iframe id="gameFrame" title="Flappy Bara" allow="autoplay; gamepad *; fullscreen *"></iframe>
+    </section>
+  </div>
+
+  <!-- Supabase + game wiring -->
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+  
+    /* --- Debug helpers (optional) --- */
+    const DEBUG = false;
+    let __debugBox = null;
+    const log = (...args) => {
+      if (!DEBUG) return;
+      console.log("[SM]", ...args);
+      if (!__debugBox) {
+        const box = document.createElement("div");
+        box.id = "debug";
+        box.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;max-height:36vh;overflow:auto;background:#0b1022dd;border:1px solid #284;padding:8px;border-radius:8px;font:12px/1.4 monospace;z-index:9999;color:#cfe";
+        box.innerHTML = "<b>Debug</b> — token & score flow logs";
+        document.body.appendChild(box);
+        __debugBox = box;
+      }
+      const p = document.createElement("div");
+      p.textContent = args.map(String).join(" ");
+      __debugBox.appendChild(p);
+      __debugBox.scrollTop = __debugBox.scrollHeight;
+    };
+  
+    /* --- Config --- */
+    const SUPABASE_URL = "https://bncmbgjnelhythdhsefk.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuY21iZ2puZWxoeXRoZGhzZWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NjcxMDksImV4cCI6MjA3MjI0MzEwOX0.f9j3ExPfDIS3L_Jpg_kzxR-rXpJvTAPHpK6CzGsgOo0";
+  
+    /* --- DOM --- */
+    const emailEl      = document.getElementById("email");
+    const otpEl        = document.getElementById("otp");
+    const meEl         = document.getElementById("me");
+    const lbEl         = document.getElementById("lb");
+    const sendOtpBtn   = document.getElementById("sendOtp");
+    const verifyOtpBtn = document.getElementById("verifyOtp");
+    const gameFrame    = document.getElementById("gameFrame");
+    const tapOverlay   = document.getElementById("tapOverlay");
+  
+    /* --- Supabase client --- */
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.sb = sb;
+  
+    /* === Option B: support BOTH Magic Link and 6-digit OTP === */
+    async function handleSupabaseMagicLink() {
+      // Supabase puts tokens in the URL fragment after redirect:  #access_token=...&refresh_token=...
+      const hash = location.hash && location.hash.startsWith('#') ? location.hash.slice(1) : '';
+      if (!hash) return;
+  
+      const frag = new URLSearchParams(hash);
+      const access_token  = frag.get('access_token');
+      const refresh_token = frag.get('refresh_token');
+  
+      if (access_token && refresh_token) {
+        try {
+          await sb.auth.setSession({ access_token, refresh_token });
+        } catch (e) {
+          console.warn('[auth] setSession from magic link failed:', e);
+        } finally {
+          // Clean tokens out of the URL bar
+          history.replaceState({}, '', location.pathname + location.search);
+        }
+      }
+    }
+    // Run this BEFORE any getSession/UI reads
+    await handleSupabaseMagicLink();
+  
+    /* --- Auth label --- */
+    async function refreshUserLabel() {
+      const { data: { user } } = await sb.auth.getUser();
+      meEl.textContent = user ? `Signed in as ${user.email || user.id.slice(0,6)}…` : "Not signed in";
+    }
+    await sb.auth.getSession().catch(()=>{});
+    await refreshUserLabel();
+    sb.auth.onAuthStateChange(() => {
+  refreshUserLabel();
+  loadBoard();   // make sure this is here so the label updates after sign-in
+});
+
+  
+    /* --- Email OTP flow --- */
+    sendOtpBtn.onclick = async () => {
+      const email = emailEl.value.trim();
+      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+      alert(error ? error.message : "A link or a 6-digit code was emailed to you.");
+    };
+    verifyOtpBtn.onclick = async () => {
+      const code = otpEl.value.trim();
+      if (!code) { await sb.auth.getSession().catch(()=>{}); await refreshUserLabel(); return; }
+      if (!/^\d{6}$/.test(code)) { alert("Enter the 6-digit code only, or leave blank."); return; }
+      const { error } = await sb.auth.verifyOtp({ email: emailEl.value.trim(), token: code, type: "email" });
+      if (error) alert(error.message);
+      await refreshUserLabel();
+    };
+
+    // --- Push my best score into the game iframe -------------------------------
+    /* --- bridge: send my real best into the game iframe --- */
+let lastMyBest = null;           // <-- REQUIRED declaration
+
+function setMyBestInGame(best) {
+  lastMyBest = Number(best) || 0;
+  const f = gameFrame?.contentWindow;
+  try { if (f) f.__sm_my_best = lastMyBest; } catch {}
+  try { localStorage.setItem('sm_my_best', String(lastMyBest)); } catch {}
+  try { if (f) f.postMessage({ type: "SET_MY_BEST", best: lastMyBest }, "*"); } catch {}
+}
+
+
+  
+   // --- Leaderboard helpers ---
+const headers = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+};
+
+// robust id compare (case-insensitive, ignore dashes)
+const sameId = (a,b) => {
+  const norm = x => (x ?? "").toString().trim().toLowerCase().replace(/-/g,"");
+  return norm(a) === norm(b);
+};
+
+// count how many players have best_score > given score
+async function countGreaterThan(score) {
+  const url = `${SUPABASE_URL}/rest/v1/leaderboard?select=best_score&best_score=gt.${encodeURIComponent(score)}`;
+  const r = await fetch(url, { headers: { ...headers, Prefer: "count=exact", Range: "0-0" } });
+
+  // Prefer header total (e.g., "0-0/123")
+  const cr = r.headers.get("content-range") || "";
+  const m = /\/(\d+)$/.exec(cr);
+  if (m) return parseInt(m[1], 10);
+
+  // Fallback to body length if header missing
+  try { const arr = await r.json(); return Array.isArray(arr) ? arr.length : 0; }
+  catch { return 0; }
+}
+
+// --- Leaderboard renderer ---
+async function loadBoard() {
+  const { data: { user } } = await sb.auth.getUser();
+  const meId = (user?.id ?? "").toString().trim().toLowerCase();
+  const myBestBox = document.getElementById('myBest');
+
+  if (!meId && myBestBox) myBestBox.textContent = 'Sign in to see your best & rank';
+
+  // Top 10
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/leaderboard?select=user_id,best_score&order=best_score.desc&limit=10`,
+    { headers }
+  );
+  const rows = await res.json();
+
+  lbEl.innerHTML = "";
+  if (!rows.length) {
+    const li = document.createElement("li"); li.className = "muted";
+    li.innerHTML = `<span>No scores yet — be the first!</span><strong>—</strong>`;
+    lbEl.appendChild(li);
+    return;
+  }
+
+  let meShown = false;
+
+  rows.forEach((r, i) => {
+    const li = document.createElement("li");
+    const uid = String(r.user_id);
+    const short = uid.slice(0,8) + "…" + uid.slice(-4);
+    const isMe = meId && sameId(uid, meId);
+
+    li.innerHTML =
+      `<span>#${i+1} ${short}${isMe ? ' <span class="you">(you)</span>' : ''}</span>` +
+      `<strong>${r.best_score}</strong>`;
+
+    if (isMe) { li.classList.add("me"); meShown = true; }
+    lbEl.appendChild(li);
+  });
+
+  // Your best + rank (even if not in top 10)
+  if (meId) {
+    // fetch my best
+    const meRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/leaderboard?select=user_id,best_score&user_id=eq.${meId}`,
+      { headers }
+    );
+    const meRows = await meRes.json();
+    const myBest = meRows?.[0] || null;
+
+    let myRank = null;
+    if (myBest && Number.isFinite(Number(myBest.best_score))) {
+      const totalGt = await countGreaterThan(myBest.best_score);
+      myRank = (totalGt || 0) + 1;
+      setMyBestInGame(myBest.best_score);
+    }
+
+    if (myBestBox) {
+      if (myBest) {
+        myBestBox.innerHTML = `Your best: <strong>${myBest.best_score}</strong> <span class="rank">(rank ${myRank ?? "—"})</span>`;
+      } else {
+        myBestBox.innerHTML = `Your best: <strong>—</strong>`;
+      }
+    }
+
+    // If I'm not in top-10, append my own row
+    if (!meShown) {
+      const li = document.createElement("li");
+      li.className = "me";
+      const shortMe = meId.slice(0,8) + "…" + meId.slice(-4);
+      li.innerHTML = `<span>Your best ${shortMe} <span class="you">(you)</span></span><strong>${myBest?.best_score ?? "—"}</strong>`;
+      lbEl.appendChild(li);
+    }
+  }
+}
+
+// Call once on load, and also on auth state changes:
+window.loadBoard = loadBoard;
+
+    
+    window.loadBoard = loadBoard;
+    loadBoard();
+  
+    /* === SCORE FLOW === */
+    const MIN = 1.30; // must match DB trigger/validation
+    const tokenFrom = (d) => { if (Array.isArray(d)) d = d[0]; return d?.token ?? d?.id ?? d; };
+  
+    const G = { state:'IDLE', token:null, startAt:0, best:0, timer:null, lastStart:0 };
+    const reset = () => { G.state='IDLE'; G.token=null; G.startAt=0; G.best=0; if (G.timer){clearTimeout(G.timer); G.timer=null;} };
+  
+    async function onRunStart() {
+      const now = Date.now();
+      if (now - G.lastStart < 800) return; // debounce bursts
+      G.lastStart = now;
+      if (G.state !== 'IDLE') return;
+  
+      const { data:{ user } = {} } = await sb.auth.getUser();
+      if (!user) return log("Not signed in");
+  
+      const { data, error } = await sb.rpc("start_run");
+      if (error) { log("start_run error:", error.message || error); return; }
+  
+      G.token   = tokenFrom(data);
+      G.startAt = performance.now();
+      G.best    = 0;
+      G.state   = 'WAITING';
+      log("minted token", G.token);
+  
+      // If we showed the tap overlay, hide it once the game actually starts.
+      hideTapOverlay();
+    }
+  
+    function onScore(n) {
+      if (G.state !== 'WAITING') return;
+      const s = Number(n) || 0;
+      if (s <= 0 || s <= G.best) return;
+      G.best = s;
+      if (G.timer) clearTimeout(G.timer);
+      G.timer = setTimeout(postNow, 250); // quiet period
+      log("best =", G.best);
+    }
+  
+    async function postNow() {
+      if (G.state !== 'WAITING' || !G.token || G.best <= 0) return;
+  
+      const { data:{ user } = {} } = await sb.auth.getUser();
+      if (!user) { reset(); return; }
+  
+      // anti-cheat: elapsed >= score × MIN
+      const elapsed  = (performance.now() - G.startAt) / 1000;
+      const required = G.best * MIN;
+      const waitMs   = Math.max(0, Math.ceil((required - elapsed) * 1000));
+      if (waitMs) { log("waiting", waitMs, "ms (anti-cheat)"); await new Promise(r=>setTimeout(r, waitMs)); }
+  
+      G.state = 'POSTING';
+      const { error } = await sb.from("scores").insert({ user_id: user.id, token: G.token, score: G.best });
+      if (error) { log("insert error:", error.message || error); reset(); return; }
+  
+      log("insert OK (score =", G.best, ")");
+      await loadBoard();
+      reset();
+    }
+  
+    // Messages from the game (same-origin)
+    window.addEventListener("message", (e) => {
+      if (e.origin && e.origin !== location.origin) return;
+      const m = e.data;
+      if (!m || typeof m !== "object") return;
+      if (m.type === "RUN_START") onRunStart();
+      else if (m.type === "SCORE") onScore(m.score);
+    }, { capture: true });
+  
+    // Hook iframe console to translate game logs → messages
+    function hookIframeConsole() {
+      const f = gameFrame?.contentWindow;
+      if (!f || f.__sm_console_hooked) return;
+      try {
+        f.__sm_console_hooked = true;
+        const origLog = f.console.log.bind(f.console);
+        f.console.log = function(...args) {
+          try {
+            for (const a of args) {
+              if (typeof a !== "string") continue;
+              if (a.startsWith("notify_run_start()")) {
+                top.postMessage({ type: "RUN_START" }, "*");
+              } else {
+                const m = a.match(/^notify_score\((\d+)\)/);
+                if (m) top.postMessage({ type: "SCORE", score: Number(m[1]) }, "*");
+              }
+            }
+          } catch {}
+          return origLog(...args);
+        };
+        log("iframe console hook active");
+      } catch (e) {
+        console.warn("[SM] hook error:", e.message);
+      }
+    }
+  
+    // Also wrap iframe globals if they ever exist
+    function hookIframeGlobals() {
+      const f = gameFrame?.contentWindow;
+      if (!f) return;
+      const wrap = (name, handler) => {
+        try {
+          let fn = f[name];
+          if (typeof fn === "function" && !fn.__wrapped) {
+            const w = function(...a){ try{ handler(...a); }catch{} return fn.apply(this,a); };
+            w.__wrapped = true; f[name] = w; log("wrapped", name);
+          }
+          Object.defineProperty(f, name, {
+            configurable: true,
+            get(){ return fn; },
+            set(v){
+              if (typeof v === "function") {
+                fn = function(...a){ try{ handler(...a); }catch{} return v.apply(this,a); };
+                fn.__wrapped = true; log("wrapped future", name);
+              } else fn = v;
+            }
+          });
+        } catch {}
+      };
+      wrap("notify_run_start", () => onRunStart());
+      wrap("notify_score", (n) => onScore(n));
+    }
+  
+    /* === Auto start attempts === */
+    function dispatchBurstOn(el, fwin) {
+      if (!el) return;
+      const E = (type, props={}) => {
+        try { return new fwin.MouseEvent(type, { bubbles:true, cancelable:true, ...props }); }
+        catch { return new MouseEvent(type, { bubbles:true, cancelable:true, ...props }); }
+      };
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width/2;
+      const cy = rect.top + rect.height/2;
+      const opts = { clientX: cx, clientY: cy };
+      try {
+        el.dispatchEvent(E('pointerdown', opts));
+        el.dispatchEvent(E('mousedown', opts));
+        el.dispatchEvent(E('mouseup', opts));
+        el.dispatchEvent(E('click', opts));
+        el.dispatchEvent(E('pointerup', opts));
+        if (typeof el.click === 'function') el.click();
+      } catch {}
+    }
+  
+    function tryAutoStartIframe() {
+      const f = gameFrame?.contentWindow;
+      if (!f) return false;
+      try {
+        const doc = f.document;
+        if (!doc) return false;
+        const btn = doc.getElementById("run") || doc.querySelector("#start, .start, .run, button");
+        const canvas = doc.querySelector("canvas");
+        const target = btn || canvas;
+        if (target) {
+          dispatchBurstOn(target, f);
+          try { canvas && canvas.focus && canvas.focus(); } catch {}
+          return true;
+        }
+      } catch {}
+      return false;
+    }
+  
+    /* === Pass-through hint for phones === */
+    function showTapOverlay() {
+      if (!tapOverlay) return;
+      tapOverlay.classList.add("show");
+      const onFirstPointer = (ev) => {
+        const r = gameFrame.getBoundingClientRect();
+        const inside = ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+        if (!inside) return; // ignore taps outside game
+        hideTapOverlay();
+        window.removeEventListener("pointerdown", onFirstPointer, true);
+      };
+      window.addEventListener("pointerdown", onFirstPointer, true);
+    }
+    function hideTapOverlay() {
+      if (!tapOverlay) return;
+      tapOverlay.classList.add("fade");
+      setTimeout(() => { tapOverlay.remove(); }, 200);
+    }
+  
+    // When the iframe loads, try to auto-start (works on desktop); on touch devices, show hint immediately.
+    if (gameFrame) {
+      const IS_TOUCH = (('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.matchMedia?.('(pointer: coarse)').matches);
+      if (IS_TOUCH) showTapOverlay(); // phones need one real tap
+  
+      gameFrame.addEventListener("load", () => {
+        hookIframeConsole();
+        hookIframeGlobals();
+  
+        // keep trying a few frames (helps some pygbag builds on desktop)
+        const t0 = performance.now();
+        const tick = () => {
+          if (tryAutoStartIframe()) return;
+          if (performance.now() - t0 < 2000) requestAnimationFrame(tick);
+          // if we already know the best when the iframe finishes loading, push it in
+          if (lastMyBest != null) setMyBestInGame(lastMyBest);
+        };
+        tick();
+      });
+  
+      // Load the game page (same-origin)
+      gameFrame.src = "build/web/index.html";
+    } else {
+      console.warn('No <iframe id="gameFrame"> found on the page.');
+    }
+  </script>  
+</body>
+</html>
