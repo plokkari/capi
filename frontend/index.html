@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,50 +6,48 @@
   <title>$Bara — Arcade memecoin</title>
 
   <!-- Styles -->
-  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="stylesheet" href="./assets/css/style.css" />
 
   <!-- Libs -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
   <script defer src="https://unpkg.com/swup@4"></script>
 
   <!-- App -->
-  <script defer src="assets/js/app.js"></script>
+  <script defer src="./assets/js/app.js"></script>
 </head>
 <body>
   <!-- starfield backdrop -->
-  <canvas class="stars"></canvas>
+  <canvas class="stars" aria-hidden="true"></canvas>
 
-  <!-- LOADER -->
-  <div id="loader" class="loader">
+  <!-- LOADER (shows on every fresh load/refresh) -->
+  <div id="loader" class="loader" aria-live="polite">
     <div class="load-card">
-      <img class="load-gif" src="assets/img/loader.gif" alt="Loading..." />
-      <div class="load-bar">
-        <div class="load-fill" id="loadFill"></div>
-      </div>
+      <img class="load-gif" src="./assets/img/loader.gif" alt="Loading..." />
+      <div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
       <div class="load-text" id="loadText">ALMOST READY…</div>
-      <div class="load-tip" id="loadTip" aria-live="polite"></div>
+      <div class="load-tip" id="loadTip"></div>
     </div>
   </div>
 
   <!-- NAV -->
   <nav class="nav">
     <div class="nav-inner">
-      <a class="logo" href="index.html#home">🟣 <span>$Bara</span></a>
+      <a class="logo" href="#home">🟣 <span>$Bara</span></a>
 
       <!-- centered tabs -->
       <div class="pill-nav">
         <a class="pill active" href="#home">Home</a>
-        <a class="pill" href="about.html">About</a>
-        <a class="pill" href="arcade.html">Arcade</a>
-        <a class="pill" href="how-to-buy.html">How to Buy</a>
-        <a class="pill" href="faq.html">FAQ</a>
+        <a class="pill" href="#about">About</a>
+        <a class="pill" href="#arcade">Arcade</a>
+        <a class="pill" href="#how">How to Buy</a>
+        <a class="pill" href="#faq">FAQ</a>
       </div>
 
       <a class="cta" href="#" onclick="alert('Buy link coming soon')">Buy $BARA</a>
     </div>
   </nav>
 
-  <!-- Swup page container -->
+  <!-- Swup page container (we use it only for smooth transitions) -->
   <div id="swup" class="transition-fade">
     <main id="home">
       <!-- SCENE 1: HERO -->
@@ -87,7 +84,7 @@
               </div>
 
               <div class="chart-wrap">
-                <canvas id="memeChart"></canvas>
+                <canvas id="memeChart" aria-label="price chart"></canvas>
               </div>
 
               <div class="chart-foot">
@@ -99,7 +96,7 @@
         </div>
 
         <!-- Overlaid GET $BARA image (behind cards, clipped at section bottom) -->
-        <img id="getBara" class="hero-floater" src="assets/img/get-bara.png" alt="GET $BARA" />
+        <img id="getBara" class="hero-floater" src="./assets/img/get-bara.png" alt="GET $BARA" />
       </section>
 
       <!-- SCENE 2: ABOUT -->
@@ -201,21 +198,5 @@
 
     <footer>© 2025 $Bara • Arcade that pays to play</footer>
   </div>
-=======
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Redirecting…</title>
-  <link rel="canonical" href="https://www.baracoin.xyz/game/">
-  <meta http-equiv="refresh" content="0; url=https://www.baracoin.xyz/game/">
-  <script>
-    // Force the www host and preserve query/hash
-    location.replace('https://www.baracoin.xyz/game/' + location.search + location.hash);
-  </script>
-</head>
-<body>
-  <p>Redirecting to <a href="https://www.baracoin.xyz/game/">https://www.baracoin.xyz/game/</a>…</p>
->>>>>>> e2e2d1e2e56ca8a22f6001053e5a41753748a985
 </body>
 </html>
