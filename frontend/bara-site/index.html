@@ -14,7 +14,8 @@
   <!-- STARTUP LOADER -->
   <div id="loader">
     <div class="loader-inner">
-      <img src="assets/bara.jpg" alt="" class="loaderLogo" onerror="this.style.display='none'">
+      <!-- inside <div id="loader"><div class="loader-inner"> ... -->
+<img src="assets/loader.gif" alt="" class="loaderLogo" onerror="this.style.display='none'">
       <div class="bar"><span></span></div>
       <div class="muted tiny" id="loaderText">Loading Bara vibes…</div>
     </div>
@@ -41,10 +42,11 @@
           <a class="btn btn-ghost" href="#swap">Buy $BARA</a>
         </div>
       </div>
-      <div class="hero-art enterable">
-        <img src="assets/hero.jpg" alt="Bara artwork" />
-        <div class="hero-glow"></div>
-      </div>
+      
+  <!-- Sign overlay -->
+  <img class="hero-sign" src="assets/get-bara.png" alt="GET $BARA">
+</div>
+
     </section>
 
     <!-- ABOUT -->
@@ -162,6 +164,26 @@
         <details class="faq-item"><summary>How do I buy?</summary><p>Use the swap widget above once live or your favorite DEX.</p></details>
       </div>
     </section>
+    
+    <!-- SOCIALS -->
+<section id="socials" class="wrap panel">
+  <h2 class="h2 enterable" style="text-align:center">Socials</h2>
+  <div class="socialBar enterable">
+    <a class="socialBtn" href="https://twitter.com/" target="_blank">
+      <img src="assets/icons/x.png" alt=""> Twitter
+    </a>
+    <a class="socialBtn" href="https://t.me/" target="_blank">
+      <img src="assets/icons/telegram.png" alt=""> Telegram
+    </a>
+    <a class="socialBtn" href="#" target="_blank">
+      <img src="assets/icons/docs.png" alt=""> Docs
+    </a>
+    <a class="socialBtn" href="#" target="_blank">
+      <img src="assets/icons/dex.png" alt=""> Dex
+    </a>
+  </div>
+</section>
+
 
 
   </main>

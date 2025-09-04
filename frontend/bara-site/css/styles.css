@@ -344,7 +344,7 @@ main.onepager{ padding-bottom: 48px; }
 }
 
 .loaderLogo{
-  height:80px;
+  height:96px;
   width:auto;
   border-radius:12px;
   animation: pulse 2s infinite;
@@ -382,3 +382,72 @@ main.onepager{ padding-bottom: 48px; }
 
 /* Tighten the hero heading spacing a touch */
 #home .h1{ margin-top: 4px; margin-bottom: 8px; }
+
+/* position sign over the poster */
+.hero-art{ position:relative }
+.hero-sign{
+  position:absolute;
+  right:-6%;
+  top:6%;
+  transform: rotate(-6deg);
+  filter: drop-shadow(0 14px 24px rgba(0,0,0,.35));
+  user-select:none; pointer-events:none;
+}
+.hero-sign img{ display:block }
+
+/* PNG version */
+.hero-sign{ max-width: 340px }
+@media (max-width: 980px){ .hero-sign{ max-width: 220px; right:-2%; top:2% } }
+
+/* CSS paper variant */
+.hero-sign.paper{
+  width: 340px; height: 190px; border-radius: 10px;
+  background: #fff; border: 4px solid #1b1f34;
+  display: grid; place-items: center;
+}
+.hero-sign.paper::before,
+.hero-sign.paper::after{
+  content:""; position:absolute; width:20px; height:20px; border:4px solid #1b1f34; border-radius:50%;
+  background:#fff;
+}
+.hero-sign.paper::before{ left:12px; top:12px }
+.hero-sign.paper::after{ right:12px; bottom:12px }
+.hero-sign.paper .paper-inner{
+  font-weight: 900; letter-spacing:1px; font-size: 36px; color:#12d06b;
+  text-shadow: 0 2px 0 #0f1a2c;
+}
+
+#loader{
+  position:fixed; inset:0; z-index:9999;
+  display:grid; place-items:center;
+  background: radial-gradient(1000px 500px at 50% 20%, rgba(160,98,255,.14), transparent 40%),
+              radial-gradient(1200px 600px at 60% 80%, rgba(80,160,255,.12), transparent 45%),
+              #0b1020;
+  transition: opacity .4s ease, visibility .4s ease;
+}
+#loader.hide{ opacity:0; visibility:hidden }
+
+.loader-inner{ text-align:center; }
+.loaderLogo{ height:110px; width:auto; border-radius:14px; display:block; margin:0 auto 14px; }
+.bar{ width:520px; max-width:72vw; height:8px; border-radius:12px; background:rgba(255,255,255,.12); margin:10px auto; overflow:hidden }
+.bar span{ display:block; height:100%; width:40%; border-radius:12px; background:rgba(255,255,255,.4); animation: sweep 2.1s ease-in-out infinite }
+@keyframes sweep{ 0%{ transform:translateX(-100%) } 50%{ transform:translateX(40%) } 100%{ transform:translateX(120%) } }
+.loader-text{ color:#c9d2ff; font-weight:700; letter-spacing:.3px; margin-top:6px; }
+
+.socialBar{
+  display:flex; flex-wrap:wrap; gap:12px; justify-content:center;
+  padding:14px; border-radius:16px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 10px 28px rgba(0,0,0,.25);
+  margin-top:10px;
+}
+.socialBtn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 14px; border-radius:999px; font-weight:800;
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+  border: 1px solid rgba(255,255,255,.14);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.socialBtn img{ width:18px; height:18px; object-fit:contain; filter: drop-shadow(0 1px 0 rgba(0,0,0,.2)); }
+.socialBtn:hover{ transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.32) }
