@@ -831,7 +831,7 @@ while True:
                         challenge["typed"] = challenge["typed"][:-1]
 
             elif game_state == "gameover":
-                if ttime.time() - gameover_time > 1 and event.key in (pygame.K_r, pygame.K_SPACE):
+                if time.time() - gameover_time > 1 and event.key in (pygame.K_r, pygame.K_SPACE):
                     reset_game(); game_state = "ready"
 
         # TEXTINPUT: soft keyboard characters for mobile / desktop IME
