@@ -158,26 +158,25 @@
   <!-- Starfield backdrop to match the main site -->
   <canvas class="stars" aria-hidden="true"></canvas>
 
-  <!-- Top nav (same structure/behavior as frontend; paths adjusted) -->
-  <nav class="nav" id="siteNav">
-    <div class="nav-inner">
-      <a class="logo" href="../index.html#home">🟣 <span>$Bara</span></a>
+ <!-- TOP BAR (inside game/index.html) -->
+<nav class="nav" id="siteNav">
+  <div class="nav-inner">
+    <a class="logo" href="/">🟣 <span>$Bara</span></a>
 
-      <!-- Hamburger (mobile only via CSS) -->
-      <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navMenu">☰</button>
+    <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navMenu">☰</button>
 
-      <!-- Pills menu -->
-      <div class="pill-nav" id="navMenu">
-        <a class="pill" href="../index.html#home">Home</a>
-        <a class="pill" href="../index.html#about">About</a>
-        <a class="pill" href="../arcade.html">Arcade</a>
-        <a class="pill" href="../index.html#how">How to Buy</a>
-        <a class="pill" href="../index.html#faq">FAQ</a>
-      </div>
-
-      <a class="cta" href="#" onclick="alert('Buy link coming soon')">Buy $BARA</a>
+    <div class="pill-nav" id="navMenu">
+      <a class="pill" href="/">Home</a>
+      <a class="pill" href="/#about">About</a>
+      <a class="pill" href="/#arcade">Arcade</a>
+      <a class="pill" href="/#how">How to Buy</a>
+      <a class="pill" href="/#faq">FAQ</a>
     </div>
-  </nav>
+
+    <a class="cta" href="#" onclick="alert('Buy link coming soon')">Buy $BARA</a>
+  </div>
+</nav>
+
 
   <div class="wrap">
     <!-- LEFT: auth + leaderboard -->

@@ -132,7 +132,17 @@ html, body { overflow-x: hidden; }            /* prevent any horizontal scroll *
   .hero-art .chart-wrap canvas { width: 100% !important; height: auto !important; }
 }
 
+/* === Native smooth anchor scroll + offset for fixed nav === */
+:root { --nav-offset: 110px; }   /* desktop header height */
+html { scroll-behavior: smooth; }
+#home, #about, #arcade, #how, #faq { scroll-margin-top: var(--nav-offset); }
+
+@media (max-width: 640px) {
+  :root { --nav-offset: 90px; }  /* phones */
+}
+
   </style>
+
 </head>
 
 <!-- safety net: if a magic link lands here, bounce into /game/ with the hash -->

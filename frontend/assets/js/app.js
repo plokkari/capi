@@ -61,31 +61,39 @@ function initReveal(){
   els.forEach(el=>io.observe(el));
 }
 
-/* ===== nav pills + smooth scrolling + active state ===== */
+/* ===== nav pills + native smooth scrolling + active state ===== */
 function initSmoothLinks(){
+  const closeMobileNav = () => {
+    document.getElementById('siteNav')?.classList.remove('open');
+    document.getElementById('navToggle')?.setAttribute('aria-expanded', 'false');
+  };
+
   document.querySelectorAll('.pill').forEach(a=>{
     a.addEventListener('click', (e)=>{
       const href = a.getAttribute('href') || '';
-      if(href.startsWith('#')){
-        e.preventDefault();
-        document.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
-        a.classList.add('active');
-        const el = document.querySelector(href);
-        if(el) window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' });
-      }
-    });
+      if (!href.startsWith('#')) return; // normal links
+
+      // DO NOT preventDefault — let the browser do native anchor scroll
+      closeMobileNav();
+
+      // update active state instantly
+      document.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
+      a.classList.add('active');
+    }, { passive:true });
   });
 }
+
 function initScrollSpy(){
-  const sections = ['#home','#about','#arcade','#how','#faq'].map(s=>document.querySelector(s)).filter(Boolean);
+  const secs = ['#home','#about','#arcade','#how','#faq']
+    .map(s=>document.querySelector(s)).filter(Boolean);
   addEventListener('scroll', ()=>{
     const y = scrollY + 120;
     let current = '#home';
-    sections.forEach(s=>{ if(s && y >= s.offsetTop) current = '#'+s.id; });
+    secs.forEach(s=>{ if(s && y >= s.offsetTop) current = '#'+s.id; });
     document.querySelectorAll('.pill').forEach(b=>{
       b.classList.toggle('active', (b.getAttribute('href') === current));
     });
-  });
+  }, { passive:true });
 }
 
 /* ===== parallax of GET $BARA image ===== */
@@ -95,10 +103,8 @@ function initParallax(){
   if(!img || !scene) return;
   function onScroll(){
     const rect = scene.getBoundingClientRect();
-    // move image up/down slightly with scroll and fade out near bottom of hero
     const t = Math.min(Math.max((0 - rect.top) / 300, -1), 1);
     img.style.transform = `translateY(${t*40}px)`;
-    // clip by section bottom visually handled by overflow hidden
   }
   addEventListener('scroll', onScroll, { passive:true });
   onScroll();
@@ -114,9 +120,8 @@ function initMemeChart(){
   grad.addColorStop(0,'rgba(122,92,255,.45)');
   grad.addColorStop(1,'rgba(122,92,255,0)');
 
-  // seed random walk
   const labels = Array.from({length:80}, (_,i)=>i.toString());
-  let v = 0.00012; // fake price
+  let v = 0.00012;
   const data = labels.map(()=> (v += (Math.random()-0.5)*v*0.15, v = Math.max(v, 0.00001)));
 
   const chart = new Chart(ctx,{
@@ -154,7 +159,6 @@ function initMemeChart(){
   });
 
   function tick(){
-    // push one new random point
     const last = chart.data.datasets[0].data.at(-1);
     let next = last + (Math.random()-0.5)*last*0.12;
     next = Math.max(next, 0.0000001);
@@ -173,7 +177,7 @@ function boot(){
   initReveal();
   initParallax();
   initScrollSpy();
-  initSmoothLinks();
+  initSmoothLinks();  // <- now lets native anchors do the scroll
   initMemeChart();
 }
 
