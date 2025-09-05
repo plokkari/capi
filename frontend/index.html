@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>$Bara — Arcade memecoin</title>
 
-  <!-- Styles -->
+  <!-- Global site styles -->
   <link rel="stylesheet" href="./assets/css/style.css" />
 
   <!-- Libs -->
@@ -18,6 +18,7 @@
 <body>
   <!-- starfield backdrop -->
   <canvas class="stars" aria-hidden="true"></canvas>
+  
 
   <!-- LOADER (shows on every fresh load/refresh) -->
   <div id="loader" class="loader" aria-live="polite">
@@ -47,7 +48,7 @@
     </div>
   </nav>
 
-  <!-- Swup page container (we use it only for smooth transitions) -->
+  <!-- Swup page container (used for smooth transitions) -->
   <div id="swup" class="transition-fade">
     <main id="home">
       <!-- SCENE 1: HERO -->
@@ -126,7 +127,8 @@
                 <div class="thumb"></div>
                 <h4>Flappybara 🐹</h4>
                 <p class="muted">Tap to dodge. Weekly prizes.</p>
-                <button class="play" onclick="alert('Open Flappybara')">Play</button>
+                <!-- Play button goes to the game wrapper -->
+                <button class="play" onclick="window.location.href='game/index.html'">Play</button>
               </div>
               <div class="game">
                 <div class="thumb"></div>
