@@ -2,8 +2,8 @@ name: Build & Deploy Flappy Bara
 
 on:
   push:
-    branches: [ main ]   # run when you push to main branch
-  workflow_dispatch:     # allow manual trigger from Actions tab
+    branches: [ main ]   # run when you push to main
+  workflow_dispatch:     # allow manual trigger
 
 jobs:
   build:
@@ -18,18 +18,20 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install pygbag
-        run: pip install pygbag==0.9.3
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install pygbag (PyPI has 0.9.2 latest)
+        run: pip install pygbag==0.9.2
 
       - name: Build game with pygbag
-        working-directory: frontend/game   # 👈 updated path
+        working-directory: frontend/game   # <- your moved folder
         run: python -m pygbag --ume_block 0 --build main.py
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # 👇 point to the built web output
-          path: frontend/game/build/web
+          path: frontend/game/build/web   # <- pygbag web output
 
   deploy:
     needs: build
