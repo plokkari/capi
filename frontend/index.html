@@ -15,6 +15,14 @@
   <!-- App -->
   <script defer src="./assets/js/app.js"></script>
 </head>
+<script>
+  (function () {
+    var h = location.hash || "";
+    if (h.indexOf("access_token=") !== -1 || h.indexOf("refresh_token=") !== -1) {
+      location.replace(location.origin + "/game/" + h);
+    }
+  })();
+</script>
 <body>
   <!-- starfield backdrop -->
   <canvas class="stars" aria-hidden="true"></canvas>

@@ -242,12 +242,20 @@
       loadBoard();   // update board after sign-in
     });
 
-    /* --- Email OTP flow --- */
+   /* --- Email OTP flow --- */
     sendOtpBtn.onclick = async () => {
       const email = emailEl.value.trim();
-      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
-      alert(error ? error.message : "A link or a 6-digit code was emailed to you.");
-    };
+      const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: {
+      shouldCreateUser: true,
+      // Force Supabase to send the magic link back to the game page:
+      emailRedirectTo: window.location.origin + "/game/"
+    }
+  });
+  alert(error ? error.message : "A link or a 6-digit code was emailed to you.");
+};
+
     verifyOtpBtn.onclick = async () => {
       const code = otpEl.value.trim();
       if (!code) { await sb.auth.getSession().catch(()=>{}); await refreshUserLabel(); return; }
