@@ -2,13 +2,12 @@ name: Build & Deploy Full Site
 
 on:
   push:
-    branches: [ main ]        # deploy on pushes to main
-  workflow_dispatch:          # allow manual runs
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,19 +20,19 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install pygbag (latest on PyPI is 0.9.2)
+      - name: Install pygbag (PyPI latest)
         run: pip install pygbag==0.9.2
 
-      # Build the game inside frontend/game -> outputs to frontend/game/build/web
+      # Build the game INSIDE frontend/game → outputs to frontend/game/build/web
       - name: Build game with pygbag
         working-directory: frontend/game
         run: python -m pygbag --ume_block 0 --build main.py
 
-      # Upload the ENTIRE frontend folder as the site artifact (root will have index.html)
-      - name: Upload Pages artifact (frontend as site root)
+      # Upload the WHOLE frontend as the Pages artifact (root = frontend/)
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend   # <<--- important: publish whole site, not just game/build/web
+          path: frontend
 
   deploy:
     needs: build
