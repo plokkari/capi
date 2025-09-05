@@ -14,7 +14,128 @@
 
   <!-- App -->
   <script defer src="./assets/js/app.js"></script>
+
+  <!-- Responsive + Hamburger menu styles -->
+  <style>
+    :root { --tap: 48px; }
+
+    /* Make pill-nav scrollable if needed */
+    .nav .pill-nav {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      max-width: 100%;
+      align-items: center;
+    }
+    .nav .pill-nav::-webkit-scrollbar { display: none; }
+
+    /* Hamburger button (hidden on desktop) */
+    .nav-toggle {
+      display: none;
+      background: none;
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--ink);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    /* Desktop baseline */
+    .nav .nav-inner {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav .logo { flex: 0 0 auto; }
+    .nav .pill-nav { flex: 1 1 auto; justify-content: center; }
+    .nav .cta { flex: 0 0 auto; }
+
+    /* HERO responsive grid */
+    @media (max-width: 1024px) {
+      .hero-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    }
+
+    /* General mobile tweaks */
+    @media (max-width: 900px) {
+      .scene .container { padding-left: 14px; padding-right: 14px; }
+    }
+    @media (max-width: 800px) {
+      .carousel { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    }
+    @media (max-width: 700px) {
+      .steps { gap: 12px; }
+      .faq .item { padding: 10px 12px; }
+    }
+    @media (max-width: 640px) {
+      #getBara { display: none; }
+    }
+    @media (max-width: 600px) {
+      .btn, .pill, .cta, button.play { min-height: var(--tap); font-size: 16px; }
+      .cta-row { display: grid; grid-template-columns: 1fr; gap: 10px; }
+      .cta-row .btn { width: 100%; }
+    }
+
+    /* ===== Mobile hamburger behavior ===== */
+    @media (max-width: 640px) {
+      .nav .nav-inner {
+        gap: 10px;
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+      .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+      /* collapse pills by default on mobile */
+      .nav .pill-nav { display: none; }
+      /* when open, show the menu stacked */
+      .nav.open .pill-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        background: rgba(10,14,28,.6);
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 14px;
+      }
+      /* layout: logo + toggle + cta on one row */
+      .nav .nav-inner { display: grid; grid-template-columns: auto 1fr auto; align-items: center; }
+      .nav .logo { grid-column: 1 / 2; }
+      .nav-toggle { grid-column: 2 / 3; justify-self: center; }
+      .nav .cta { grid-column: 3 / 4; justify-self: end; }
+      /* menu occupies full row underneath when open */
+      .nav.open .pill-nav { grid-column: 1 / -1; }
+    }
+    /* --- Fix mobile clipping / right-edge cutoffs --- */
+html, body { overflow-x: hidden; }            /* prevent any horizontal scroll */
+.scene, .scene .container { overflow: visible; }
+
+@media (max-width: 640px) {
+  /* make sure hero cards never exceed viewport width */
+  .hero-grid,
+  .hero-grid .card,
+  .hero-art,
+  .hero-art .chart-wrap {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  /* tighten side paddings so cards don't "kiss" the edge */
+  .scene .container { padding-left: 12px; padding-right: 12px; }
+
+  /* reveal animations shouldn’t clip content */
+  .reveal { overflow: visible; }
+
+  /* keep chart neatly inside its card on tiny screens */
+  .hero-art .chart-wrap { overflow: hidden; border-radius: inherit; }
+  .hero-art .chart-wrap canvas { width: 100% !important; height: auto !important; }
+}
+
+  </style>
 </head>
+
+<!-- safety net: if a magic link lands here, bounce into /game/ with the hash -->
 <script>
   (function () {
     var h = location.hash || "";
@@ -23,10 +144,10 @@
     }
   })();
 </script>
+
 <body>
   <!-- starfield backdrop -->
   <canvas class="stars" aria-hidden="true"></canvas>
-  
 
   <!-- LOADER (shows on every fresh load/refresh) -->
   <div id="loader" class="loader" aria-live="polite">
@@ -39,12 +160,15 @@
   </div>
 
   <!-- NAV -->
-  <nav class="nav">
+  <nav class="nav" id="siteNav">
     <div class="nav-inner">
       <a class="logo" href="#home">🟣 <span>$Bara</span></a>
 
-      <!-- centered tabs -->
-      <div class="pill-nav">
+      <!-- Hamburger button (mobile only via CSS) -->
+      <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navMenu">☰</button>
+
+      <!-- Pills menu (collapses on mobile) -->
+      <div class="pill-nav" id="navMenu">
         <a class="pill active" href="#home">Home</a>
         <a class="pill" href="#about">About</a>
         <a class="pill" href="#arcade">Arcade</a>
@@ -104,7 +228,7 @@
           </div>
         </div>
 
-        <!-- Overlaid GET $BARA image (behind cards, clipped at section bottom) -->
+        <!-- Overlaid GET $BARA image (behind cards) -->
         <img id="getBara" class="hero-floater" src="./assets/img/get-bara.png" alt="GET $BARA" />
       </section>
 
@@ -135,7 +259,6 @@
                 <div class="thumb"></div>
                 <h4>Flappybara 🐹</h4>
                 <p class="muted">Tap to dodge. Weekly prizes.</p>
-                <!-- Play button goes to the game wrapper -->
                 <button class="play" onclick="window.location.href='game/index.html'">Play</button>
               </div>
               <div class="game">
@@ -208,5 +331,35 @@
 
     <footer>© 2025 $Bara • Arcade that pays to play</footer>
   </div>
+
+  <!-- Hamburger toggle script -->
+  <script>
+    (function () {
+      const nav = document.getElementById('siteNav');
+      const btn = document.getElementById('navToggle');
+      const menu = document.getElementById('navMenu');
+
+      function closeMenu() {
+        nav.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+
+      btn?.addEventListener('click', () => {
+        const willOpen = !nav.classList.contains('open');
+        nav.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(willOpen));
+      });
+
+      // Close menu when clicking a link (mobile)
+      menu?.querySelectorAll('a').forEach(a => {
+        a.addEventListener('click', closeMenu);
+      });
+
+      // Close on escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeMenu();
+      });
+    })();
+  </script>
 </body>
 </html>

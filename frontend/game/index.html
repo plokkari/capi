@@ -16,9 +16,11 @@
   <script defer src="https://unpkg.com/swup@4"></script>
   <script defer src="../assets/js/app.js"></script>
 
-  <!-- Game-specific extra styles: keep ONLY layout/look unique to this page -->
+  <!-- Game-specific + mobile nav styles -->
   <style>
-    /* Layout for leaderboard + game box */
+    :root { --tap: 48px; }
+
+    /* ===== Layout (leaderboard + game) ===== */
     .wrap {
       display:grid;
       grid-template-columns: 360px 1fr;
@@ -96,6 +98,8 @@
 
     .me { margin-top:6px; font-size:13px; color:var(--muted); }
 
+    /* ===== Mobile fixes ===== */
+    html, body { overflow-x:hidden; }
     @media (max-width: 900px) {
       .wrap { grid-template-columns: 1fr; grid-template-areas: "right" "left"; }
       #gameFrame { width:min(92vw, 420px); }
@@ -103,33 +107,77 @@
     @media (max-width: 480px) { button, input { font-size:16px; } }
 
     /* Use the site’s brand accent on specific bits */
-    .accent { color: var(--accent); }       /* fallback if not in style.css */
-    header .tag { color: var(--accent); }   /* make the small "Game" label purple/blue */
+    .accent { color: var(--accent); }
+    header .tag { color: var(--accent); }
 
+    /* ====== HAMBURGER NAV to match frontend ====== */
+    .nav .nav-inner {
+      display:flex; align-items:center; gap:16px;
+    }
+    .nav .logo { flex:0 0 auto; }
+    .nav .pill-nav {
+      display:flex; gap:10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+      max-width:100%; align-items:center; flex:1 1 auto; justify-content:center;
+    }
+    .nav .pill-nav::-webkit-scrollbar { display:none; }
+    .nav .cta { flex:0 0 auto; }
+
+    .nav-toggle {
+      display:none;
+      background:none;
+      border:1px solid rgba(255,255,255,.08);
+      color:var(--ink);
+      border-radius:12px;
+      padding:8px 12px;
+      font-size:20px;
+      line-height:1;
+      cursor:pointer;
+    }
+
+    @media (max-width: 640px) {
+      .nav .nav-inner {
+        gap:10px; padding-left:12px; padding-right:12px;
+        display:grid; grid-template-columns:auto 1fr auto; align-items:center;
+      }
+      .nav .logo { grid-column:1 / 2; }
+      .nav-toggle { display:inline-flex; align-items:center; justify-content:center; grid-column:2 / 3; justify-self:center; }
+      .nav .cta { grid-column:3 / 4; justify-self:end; }
+
+      /* collapse pills by default */
+      .nav .pill-nav { display:none; }
+      /* show when nav has .open */
+      .nav.open .pill-nav {
+        display:flex; flex-direction:column; gap:8px; padding:10px;
+        background:rgba(10,14,28,.6); border:1px solid rgba(255,255,255,.06); border-radius:14px;
+        grid-column:1 / -1;
+      }
+    }
   </style>
 </head>
 <body>
   <!-- Starfield backdrop to match the main site -->
   <canvas class="stars" aria-hidden="true"></canvas>
-  <!-- Top nav copied from site, paths adjusted to work from /frontend/game/ -->
-<!-- Top nav copied from site, with working links -->
-<nav class="nav">
-  <div class="nav-inner">
-    <!-- Logo goes back to site home -->
-    <a class="logo" href="../index.html#home">🟣 <span>$Bara</span></a>
 
-    <div class="pill-nav">
-      <a class="pill" href="../index.html#home">Home</a>
-      <a class="pill" href="../index.html#about">About</a>
-      <a class="pill" href="../arcade.html">Arcade</a>
-      <a class="pill" href="../index.html#how">How to Buy</a>
-      <a class="pill" href="../index.html#faq">FAQ</a>
+  <!-- Top nav (same structure/behavior as frontend; paths adjusted) -->
+  <nav class="nav" id="siteNav">
+    <div class="nav-inner">
+      <a class="logo" href="../index.html#home">🟣 <span>$Bara</span></a>
+
+      <!-- Hamburger (mobile only via CSS) -->
+      <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navMenu">☰</button>
+
+      <!-- Pills menu -->
+      <div class="pill-nav" id="navMenu">
+        <a class="pill" href="../index.html#home">Home</a>
+        <a class="pill" href="../index.html#about">About</a>
+        <a class="pill" href="../arcade.html">Arcade</a>
+        <a class="pill" href="../index.html#how">How to Buy</a>
+        <a class="pill" href="../index.html#faq">FAQ</a>
+      </div>
+
+      <a class="cta" href="#" onclick="alert('Buy link coming soon')">Buy $BARA</a>
     </div>
-
-    <a class="cta" href="#" onclick="alert('Buy link coming soon')">Buy $BARA</a>
-  </div>
-</nav>
-
+  </nav>
 
   <div class="wrap">
     <!-- LEFT: auth + leaderboard -->
@@ -206,28 +254,19 @@
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     window.sb = sb;
 
-    /* === Option B: support BOTH Magic Link and 6-digit OTP === */
+    /* === Handle magic link tokens in URL hash === */
     async function handleSupabaseMagicLink() {
-      // Supabase puts tokens in the URL fragment after redirect:  #access_token=...&refresh_token=...
       const hash = location.hash && location.hash.startsWith('#') ? location.hash.slice(1) : '';
       if (!hash) return;
-
       const frag = new URLSearchParams(hash);
       const access_token  = frag.get('access_token');
       const refresh_token = frag.get('refresh_token');
-
       if (access_token && refresh_token) {
-        try {
-          await sb.auth.setSession({ access_token, refresh_token });
-        } catch (e) {
-          console.warn('[auth] setSession from magic link failed:', e);
-        } finally {
-          // Clean tokens out of the URL bar
-          history.replaceState({}, '', location.pathname + location.search);
-        }
+        try { await sb.auth.setSession({ access_token, refresh_token }); }
+        catch (e) { console.warn('[auth] setSession from magic link failed:', e); }
+        finally { history.replaceState({}, '', location.pathname + location.search); }
       }
     }
-    // Run this BEFORE any getSession/UI reads
     await handleSupabaseMagicLink();
 
     /* --- Auth label --- */
@@ -237,25 +276,21 @@
     }
     await sb.auth.getSession().catch(()=>{});
     await refreshUserLabel();
-    sb.auth.onAuthStateChange(() => {
-      refreshUserLabel();
-      loadBoard();   // update board after sign-in
-    });
+    sb.auth.onAuthStateChange(() => { refreshUserLabel(); loadBoard(); });
 
-   /* --- Email OTP flow --- */
+    /* --- Email OTP flow --- */
     sendOtpBtn.onclick = async () => {
       const email = emailEl.value.trim();
       const { error } = await sb.auth.signInWithOtp({
-      email,
-      options: {
-      shouldCreateUser: true,
-      // Force Supabase to send the magic link back to the game page:
-      emailRedirectTo: window.location.origin + "/game/"
-    }
-  });
-  alert(error ? error.message : "A link or a 6-digit code was emailed to you.");
-};
-
+        email,
+        options: {
+          shouldCreateUser: true,
+          // Force Supabase to send the magic link back to the game page:
+          emailRedirectTo: window.location.origin + "/game/"
+        }
+      });
+      alert(error ? error.message : "A link or a 6-digit code was emailed to you.");
+    };
     verifyOtpBtn.onclick = async () => {
       const code = otpEl.value.trim();
       if (!code) { await sb.auth.getSession().catch(()=>{}); await refreshUserLabel(); return; }
@@ -280,12 +315,10 @@
       apikey: SUPABASE_ANON_KEY,
       Authorization: `Bearer ${SUPABASE_ANON_KEY}`
     };
-
     const sameId = (a,b) => {
       const norm = x => (x ?? "").toString().trim().toLowerCase().replace(/-/g,"");
       return norm(a) === norm(b);
     };
-
     async function countGreaterThan(score) {
       const url = `${SUPABASE_URL}/rest/v1/leaderboard?select=best_score&best_score=gt.${encodeURIComponent(score)}`;
       const r = await fetch(url, { headers: { ...headers, Prefer: "count=exact", Range: "0-0" } });
@@ -574,6 +607,32 @@
     } else {
       console.warn('No <iframe id="gameFrame"> found on the page.');
     }
+  </script>
+
+  <!-- Hamburger toggle (tiny script; same behavior as frontend) -->
+  <script>
+    (function () {
+      const nav = document.getElementById('siteNav');
+      const btn = document.getElementById('navToggle');
+      const menu = document.getElementById('navMenu');
+
+      function closeMenu() {
+        nav.classList.remove('open');
+        btn && btn.setAttribute('aria-expanded', 'false');
+      }
+
+      btn && btn.addEventListener('click', () => {
+        const willOpen = !nav.classList.contains('open');
+        nav.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(willOpen));
+      });
+
+      // Close when clicking a link (mobile)
+      menu && menu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
+
+      // Close on Escape
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+    })();
   </script>
 </body>
 </html>
