@@ -130,25 +130,19 @@ function initParallax(){
    Scroll-spy (highlight nav pill)
 ========================= */
 function initScrollSpy(){
-  const pills = [...document.querySelectorAll('.pill')];
-  const ids = ['homeSection','about','arcade','how','faq','socials'];
-  const targets = ids.map(id=>document.getElementById(id)).filter(Boolean);
-  if(!targets.length) return;
+  const sections = ['#home','#about','#arcade','#roadmap','#faq','#socials']
+    .map(s=>document.querySelector(s)).filter(Boolean);
 
-  const io = new IntersectionObserver((entries)=>{
-    entries.forEach(e=>{
-      if(e.isIntersecting){
-        const id = '#'+e.target.id.replace('homeSection','home');
-        pills.forEach(a=>{
-          const href = a.getAttribute('href') || '';
-          a.classList.toggle('active', href.endsWith(id));
-        });
-      }
+  addEventListener('scroll', ()=>{
+    const y = scrollY + 120;
+    let current = '#home';
+    sections.forEach(s=>{ if(s && y >= s.offsetTop) current = '#'+s.id; });
+    document.querySelectorAll('.pill').forEach(b=>{
+      b.classList.toggle('active', (b.getAttribute('href') === current));
     });
-  }, {rootMargin:'-40% 0px -55% 0px', threshold:0});
-  targets.forEach(s=>io.observe(s));
+  });
 }
-
+   
 /* =========================
    Smooth scroll for same-page anchors
 ========================= */
