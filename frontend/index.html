@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>$Bara — Arcade memecoin</title>
 
-  <!-- Global site styles -->
+  <!-- Styles -->
   <link rel="stylesheet" href="./assets/css/style.css" />
 
   <!-- Libs -->
@@ -14,183 +14,52 @@
 
   <!-- App -->
   <script defer src="./assets/js/app.js"></script>
-
-  <!-- Responsive + Hamburger menu styles -->
-  <style>
-    :root { --tap: 48px; }
-
-    /* Make pill-nav scrollable if needed */
-    .nav .pill-nav {
-      display: flex;
-      gap: 10px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      max-width: 100%;
-      align-items: center;
-    }
-    .nav .pill-nav::-webkit-scrollbar { display: none; }
-
-    /* Hamburger button (hidden on desktop) */
-    .nav-toggle {
-      display: none;
-      background: none;
-      border: 1px solid rgba(255,255,255,.08);
-      color: var(--ink);
-      border-radius: 12px;
-      padding: 8px 12px;
-      font-size: 20px;
-      line-height: 1;
-      cursor: pointer;
-    }
-
-    /* Desktop baseline */
-    .nav .nav-inner {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .nav .logo { flex: 0 0 auto; }
-    .nav .pill-nav { flex: 1 1 auto; justify-content: center; }
-    .nav .cta { flex: 0 0 auto; }
-
-    /* HERO responsive grid */
-    @media (max-width: 1024px) {
-      .hero-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-    }
-
-    /* General mobile tweaks */
-    @media (max-width: 900px) {
-      .scene .container { padding-left: 14px; padding-right: 14px; }
-    }
-    @media (max-width: 800px) {
-      .carousel { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    }
-    @media (max-width: 700px) {
-      .steps { gap: 12px; }
-      .faq .item { padding: 10px 12px; }
-    }
-    @media (max-width: 640px) {
-      #getBara { display: none; }
-    }
-    @media (max-width: 600px) {
-      .btn, .pill, .cta, button.play { min-height: var(--tap); font-size: 16px; }
-      .cta-row { display: grid; grid-template-columns: 1fr; gap: 10px; }
-      .cta-row .btn { width: 100%; }
-    }
-
-    /* ===== Mobile hamburger behavior ===== */
-    @media (max-width: 640px) {
-      .nav .nav-inner {
-        gap: 10px;
-        padding-left: 12px;
-        padding-right: 12px;
-      }
-      .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
-      /* collapse pills by default on mobile */
-      .nav .pill-nav { display: none; }
-      /* when open, show the menu stacked */
-      .nav.open .pill-nav {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 10px;
-        background: rgba(10,14,28,.6);
-        border: 1px solid rgba(255,255,255,.06);
-        border-radius: 14px;
-      }
-      /* layout: logo + toggle + cta on one row */
-      .nav .nav-inner { display: grid; grid-template-columns: auto 1fr auto; align-items: center; }
-      .nav .logo { grid-column: 1 / 2; }
-      .nav-toggle { grid-column: 2 / 3; justify-self: center; }
-      .nav .cta { grid-column: 3 / 4; justify-self: end; }
-      /* menu occupies full row underneath when open */
-      .nav.open .pill-nav { grid-column: 1 / -1; }
-    }
-    /* --- Fix mobile clipping / right-edge cutoffs --- */
-html, body { overflow-x: hidden; }            /* prevent any horizontal scroll */
-.scene, .scene .container { overflow: visible; }
-
-@media (max-width: 640px) {
-  /* make sure hero cards never exceed viewport width */
-  .hero-grid,
-  .hero-grid .card,
-  .hero-art,
-  .hero-art .chart-wrap {
-    max-width: 100%;
-    width: 100%;
-  }
-
-  /* tighten side paddings so cards don't "kiss" the edge */
-  .scene .container { padding-left: 12px; padding-right: 12px; }
-
-  /* reveal animations shouldn’t clip content */
-  .reveal { overflow: visible; }
-
-  /* keep chart neatly inside its card on tiny screens */
-  .hero-art .chart-wrap { overflow: hidden; border-radius: inherit; }
-  .hero-art .chart-wrap canvas { width: 100% !important; height: auto !important; }
-}
-
-/* === Native smooth anchor scroll + offset for fixed nav === */
-:root { --nav-offset: 110px; }   /* desktop header height */
-html { scroll-behavior: smooth; }
-#home, #about, #arcade, #how, #faq { scroll-margin-top: var(--nav-offset); }
-
-@media (max-width: 640px) {
-  :root { --nav-offset: 90px; }  /* phones */
-}
-
-  </style>
-
 </head>
-
-<!-- safety net: if a magic link lands here, bounce into /game/ with the hash -->
-<script>
-  (function () {
-    var h = location.hash || "";
-    if (h.indexOf("access_token=") !== -1 || h.indexOf("refresh_token=") !== -1) {
-      location.replace(location.origin + "/game/" + h);
-    }
-  })();
-</script>
-
 <body>
   <!-- starfield backdrop -->
   <canvas class="stars" aria-hidden="true"></canvas>
 
-  <!-- LOADER (shows on every fresh load/refresh) -->
-  <div id="loader" class="loader" aria-live="polite">
-    <div class="load-card">
-      <img class="load-gif" src="./assets/img/loader.gif" alt="Loading..." />
-      <div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
-      <div class="load-text" id="loadText">ALMOST READY…</div>
-      <div class="load-tip" id="loadTip"></div>
-    </div>
+
+   <!-- Loader decor (goes inside #loader, sibling to .load-card) -->
+<!-- Loader overlay -->
+<div id="loader" class="loader" aria-live="polite">
+  <!-- decor must be INSIDE the loader -->
+  <div class="loader-decor" aria-hidden="true">
+    <div class="ring"></div>
+    <span class="dot d1"></span>
+    <span class="dot d2"></span>
+    <span class="dot d3"></span>
   </div>
 
+  <div class="load-card">
+    <img class="load-gif" src="./assets/img/loader.gif" alt="Loading..." />
+    <div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
+    <div class="load-text" id="loadText">LOADING…</div>
+    <div class="load-tip"  id="loadTip"></div>
+  </div>
+</div>
+
+
   <!-- NAV -->
-  <nav class="nav" id="siteNav">
+  <nav class="nav">
     <div class="nav-inner">
       <a class="logo" href="#home">🟣 <span>$Bara</span></a>
 
-      <!-- Hamburger button (mobile only via CSS) -->
-      <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navMenu">☰</button>
+      <!-- centered tabs -->
+      <div class="pill-nav">
+  <a class="pill active" href="#home">Home</a>
+  <a class="pill" href="#about">About</a>
+  <a class="pill" href="#arcade">Arcade</a>
+  <a class="pill" href="#roadmap">Roadmap</a>
+  <a class="pill" href="#faq">FAQ</a>
+</div>
 
-      <!-- Pills menu (collapses on mobile) -->
-      <div class="pill-nav" id="navMenu">
-        <a class="pill active" href="#home">Home</a>
-        <a class="pill" href="#about">About</a>
-        <a class="pill" href="#arcade">Arcade</a>
-        <a class="pill" href="#how">How to Buy</a>
-        <a class="pill" href="#faq">FAQ</a>
-      </div>
 
       <a class="cta" href="#" onclick="alert('Buy link coming soon')">Buy $BARA</a>
     </div>
   </nav>
 
-  <!-- Swup page container (used for smooth transitions) -->
+  <!-- Swup page container (we use it only for smooth transitions) -->
   <div id="swup" class="transition-fade">
     <main id="home">
       <!-- SCENE 1: HERO -->
@@ -227,8 +96,10 @@ html { scroll-behavior: smooth; }
               </div>
 
               <div class="chart-wrap">
-                <canvas id="memeChart" aria-label="price chart"></canvas>
-              </div>
+  <canvas id="memeChart" aria-label="price chart"></canvas>
+  <div class="chart-note">Demo data — live chart unlocks at launch</div>
+</div>
+
 
               <div class="chart-foot">
                 <div class="price" id="memePrice">$0.000000</div>
@@ -238,138 +109,268 @@ html { scroll-behavior: smooth; }
           </div>
         </div>
 
-        <!-- Overlaid GET $BARA image (behind cards) -->
+        <!-- Overlaid GET $BARA image (behind cards, clipped at section bottom) -->
         <img id="getBara" class="hero-floater" src="./assets/img/get-bara.png" alt="GET $BARA" />
       </section>
 
       <!-- SCENE 2: ABOUT -->
-      <section class="scene" id="about">
-        <div class="container reveal">
-          <h2 class="section-title">About $Bara</h2>
-          <div class="about">
-            <div class="page">
-              <h3>Game-Powered Token</h3>
-              <p class="muted">Weekly leaderboards pay out $BARA + partner tokens. Easy to play, hard to master.</p>
-            </div>
-            <div class="page">
-              <h3>Arcade Roadmap</h3>
-              <p class="muted">Flappybara → Endless runner → PVP mini-duels. Seasonal events, NFT cosmetics, and cross-game boards.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+     <section class="scene" id="about">
+  <div class="container reveal">
+    <h2 class="section-title">About $BARA</h2>
+    <div class="about">
+      <div class="page">
+        <h3>Arcade-First Memecoin</h3>
+        <p class="muted">
+          $BARA is built on Solana and designed to be played with. Our mission is to merge
+          the simplicity of viral arcade games with crypto—so holding $BARA is fun,
+          competitive, and rewarding.
+        </p>
+      </div>
+      <div class="page">
+        <h3>Why Arcade?</h3>
+        <p class="muted">
+          Arcade games are timeless: easy to start, hard to master. Climb the leaderboards,
+          earn weekly rewards, and help shape the next drops and events with the community.
+        </p>
+      </div>
+      <div class="page">
+        <h3>What Makes $BARA Different</h3>
+        <p class="muted">
+           <b>Play-to-Earn Arcade</b> — Weekly prize pools for top players.<br/>
+           <b>Community First</b> — Fun over over-complicated tokenomics.<br/>
+           <b>NFT Perks (later)</b> — Cosmetics & access; never pay-to-win.<br/>
+           <b>Simple & Transparent</b> — 0% buy/sell tax, clear supply, renounced contract.
+        </p>
+      </div>
+      <div class="page">
+        <h3>The Vision</h3>
+        <p class="muted">
+          Step by step we’ll expand the Arcade with new titles, seasonal events, NFT cosmetics,
+          and larger competitions—guided by the players who show up and play.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
 
       <!-- SCENE 3: ARCADE -->
-      <section class="scene" id="arcade">
-        <div class="container reveal">
-          <h2 class="section-title">Arcade</h2>
-          <div class="card">
-            <div class="carousel">
-              <div class="game">
-                <div class="thumb"></div>
-                <h4>Flappybara 🐹</h4>
-                <p class="muted">Tap to dodge. Weekly prizes.</p>
-                <button class="play" onclick="window.location.href='game/index.html'">Play</button>
-              </div>
-              <div class="game">
-                <div class="thumb"></div>
-                <h4>Capy Dash</h4>
-                <p class="muted">Endless runner prototype.</p>
-                <button class="play" onclick="alert('Coming soon')">Preview</button>
-              </div>
-              <div class="game">
-                <div class="thumb"></div>
-                <h4>Bararena</h4>
-                <p class="muted">1v1 mini-duels.</p>
-                <button class="play" onclick="alert('Coming soon')">Preview</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+<section class="scene" id="arcade">
+  <div class="container reveal">
+    <h2 class="section-title">Arcade</h2>
 
-      <!-- SCENE 4: HOW TO BUY -->
-      <section class="scene" id="how">
-        <div class="container reveal">
-          <h2 class="section-title">How to Buy</h2>
-          <div class="steps">
-            <div class="step"><b>1) Get a Wallet</b><br><span class="muted">Phantom or Backpack on Solana.</span></div>
-            <div class="step"><b>2) Fund with SOL</b><br><span class="muted">On-ramp or CEX → send to wallet.</span></div>
-            <div class="step"><b>3) Swap for $BARA</b><br><span class="muted">Use our quick swap (soon) or Jupiter.</span></div>
-          </div>
+    <div class="arcade-row">
+
+      <!-- GAME 1 — Flappybara (live) -->
+      <article class="game-card">
+        <div class="thumb">
+          <img src="assets/img/bara-fly.png" alt="Flappybara preview" />
         </div>
-      </section>
+        <header class="game-head">
+          <h4 class="game-title">Flappybara <span class="emoji">🧸</span></h4>
+          <p class="muted">Tap to dodge. Weekly prizes.</p>
+        </header>
+        <div class="game-actions">
+          <button class="btn primary" onclick="window.location.href='game/index.html'">Play</button>
+        </div>
+      </article>
+
+      <!-- GAME 2 — Coming soon -->
+      <article class="game-card soon">
+        <div class="thumb">
+          <span class="ribbon">COMING SOON</span>
+        </div>
+        <header class="game-head">
+          <h4 class="game-title">TBA</h4>
+          <p class="muted">New title arriving after launch.</p>
+        </header>
+        <div class="game-actions">
+          <button class="btn" disabled>Coming soon</button>
+        </div>
+      </article>
+
+      <!-- GAME 3 — Coming soon -->
+      <article class="game-card soon">
+        <div class="thumb">
+          <span class="ribbon">COMING SOON</span>
+        </div>
+        <header class="game-head">
+          <h4 class="game-title">TBA</h4>
+          <p class="muted">Revealed with the community.</p>
+        </header>
+        <div class="game-actions">
+          <button class="btn" disabled>Coming soon</button>
+        </div>
+      </article>
+
+    </div><!-- /.arcade-row -->
+  </div><!-- /.container -->
+</section>
+
+
+
+      <section class="scene" id="roadmap">
+  <div class="container reveal">
+    <h2 class="section-title">Roadmap</h2>
+
+    <div class="about"> <!-- reuse the 2-col grid -->
+      <div class="page">
+        <h3>Phase 1 — Arcade Awakens</h3>
+        <p class="muted">
+          • Website + branding live<br/>
+          • First $BARA arcade game released<br/>
+          • Leaderboards + weekly rewards enabled<br/>
+          • Community building on Telegram / X<br/>
+        </p>
+      </div>
+
+      <div class="page">
+        <h3>Phase 2 — The Launchpad</h3>
+        <p class="muted">
+          • Full token deployment & trading<br/>
+          • Bigger weekly rewards and optimizations<br/>
+          • Next arcade title announcement
+        </p>
+      </div>
+
+      <div class="page">
+        <h3>Phase 3 — Growth Mode</h3>
+        <p class="muted">
+          • New games (revealed with the community)<br/>
+          • Seasonal tournaments & events<br/>
+          • Partner collaborations for cross-token rewards
+        </p>
+      </div>
+
+      <div class="page">
+        <h3>Phase 4 — Ecosystem</h3>
+        <p class="muted">
+          • Multi-game Arcade Hub<br/>
+          • DAO-style voting on features/games<br/>
+          • Explore mobile app & broader integrations
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
 
       <!-- SCENE 5: FAQ -->
-      <section class="scene" id="faq">
-        <div class="container reveal">
-          <h2 class="section-title">FAQ</h2>
-          <div class="faq">
-            <details class="item">
-              <summary>Is the contract renounced / taxes?</summary>
-              <div class="content">0% / 0% taxes. Contract & LP details will be posted at launch.</div>
-            </details>
-            <details class="item">
-              <summary>How do leaderboard rewards work?</summary>
-              <div class="content">Weekly snapshots. Top ranks split a prize pool in $BARA + partner tokens. Anti-bot checks included.</div>
-            </details>
-            <details class="item">
-              <summary>Will there be NFTs?</summary>
-              <div class="content">Yes—cosmetic skins + early access perks. No pay-to-win.</div>
-            </details>
-          </div>
+     <section class="scene" id="faq">
+  <div class="container reveal">
+    <h2 class="section-title">FAQ</h2>
+    <div class="faq">
+      <details class="item" open>
+        <summary>What is $BARA?</summary>
+        <div class="content">
+          $BARA is an arcade-first memecoin on Solana. Play our games, climb the leaderboards,
+          and win rewards — it’s crypto made fun.
         </div>
-      </section>
+      </details>
+
+      <details class="item">
+        <summary>How do rewards work?</summary>
+        <div class="content">
+          Every week, top players on our leaderboards share prize pools in $BARA and sometimes
+          partner tokens.
+        </div>
+      </details>
+
+      <details class="item">
+        <summary>What games are available?</summary>
+        <div class="content">
+          Our first game launches with $BARA. New titles will be revealed as the community grows.
+        </div>
+      </details>
+
+      <details class="item">
+        <summary>Will there be NFTs?</summary>
+        <div class="content">
+          Yes — NFTs arrive later with cosmetics and perks.
+        </div>
+      </details>
+
+      <details class="item">
+        <summary>Is $BARA safe?</summary>
+        <div class="content">
+          0% buy/sell tax, transparent supply, and a renounced contract. Liquidity details will
+          be shared at launch.
+        </div>
+      </details>
+
+      <details class="item">
+        <summary>How do I buy $BARA?</summary>
+        <div class="content">
+          Get a Solana wallet (Phantom/Backpack), fund with SOL, and swap for $BARA on launch.
+          DEX links will be posted on the website and socials.
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
 
       <!-- SCENE 6: SOCIALS (tighter) -->
       <section class="scene scene-tight" id="socials">
         <div class="container reveal socials">
           <h2 class="section-title">Socials</h2>
           <div class="ring">
-            <a class="icon" style="--i:0" href="#" title="X">X</a>
-            <a class="icon" style="--i:1" href="#" title="Telegram">TG</a>
-            <a class="icon" style="--i:2" href="#" title="Discord">DC</a>
-            <a class="icon" style="--i:3" href="#" title="YouTube">YT</a>
-            <a class="icon" style="--i:4" href="#" title="Spotify">SP</a>
-            <a class="icon" style="--i:5" href="#" title="Instagram">IG</a>
-            <a class="icon" style="--i:6" href="#" title="Website">WB</a>
-            <a class="icon" style="--i:7" href="#" title="GitHub">GH</a>
-          </div>
+  <!-- Center medallion -->
+  <div class="ring">
+  <!-- Center medallion -->
+  <div class="ring-center">
+    <span class="brand">$BARA</span>
+    <span class="tag">Join us</span>
+  </div>
+
+  <!-- Index map (clockwise, starting at TOP):
+       0 = top, 1 = top-right, 2 = right, 3 = bottom-right,
+       4 = bottom, 5 = bottom-left, 6 = left, 7 = top-left -->
+
+  <!-- 0 TOP: X -->
+  <a class="icon" style="--i:0" href="https://twitter.com/your-handle" target="_blank" rel="noopener">X</a>
+
+  <!-- 1: orb -->
+  <span class="icon ghost" style="--i:1"></span>
+
+  <!-- 2 RIGHT: TG -->
+  <a class="icon" style="--i:2" href="https://t.me/your-channel" target="_blank" rel="noopener">TG</a>
+
+  <!-- 3: orb -->
+  <span class="icon ghost" style="--i:3"></span>
+
+  <!-- 4 BOTTOM: DEX -->
+  <a class="icon" style="--i:4" href="https://dexscreener.com/yourpair" target="_blank" rel="noopener">DEX</a>
+
+  <!-- 5: orb -->
+  <span class="icon ghost" style="--i:5"></span>
+
+  <!-- 6 LEFT: TikTok -->
+  <a class="icon" style="--i:6" href="https://www.tiktok.com/@your-handle" target="_blank" rel="noopener">TT</a>
+
+  <!-- 7: orb -->
+  <span class="icon ghost" style="--i:7"></span>
+</div>
+
+
+  <!-- Real links -->
+  <a class="icon" style="--i:0" href="https://twitter.com/..." target="_blank" rel="noopener">X</a>
+  <a class="icon" style="--i:1" href="https://t.me/..." target="_blank" rel="noopener">TG</a>
+  <a class="icon" style="--i:2" href="https://dexscreener.com/..." target="_blank" rel="noopener">DEX</a>
+
+  <!-- Empty spots -> gradient orbs (placeholders) -->
+  <span class="icon ghost" style="--i:3"></span>
+  <span class="icon ghost" style="--i:4"></span>
+  <span class="icon ghost" style="--i:5"></span>
+  <span class="icon ghost" style="--i:6"></span>
+  <span class="icon ghost" style="--i:7"></span>
+</div>
+
         </div>
       </section>
     </main>
 
     <footer>© 2025 $Bara • Arcade that pays to play</footer>
   </div>
-
-  <!-- Hamburger toggle script -->
-  <script>
-    (function () {
-      const nav = document.getElementById('siteNav');
-      const btn = document.getElementById('navToggle');
-      const menu = document.getElementById('navMenu');
-
-      function closeMenu() {
-        nav.classList.remove('open');
-        btn.setAttribute('aria-expanded', 'false');
-      }
-
-      btn?.addEventListener('click', () => {
-        const willOpen = !nav.classList.contains('open');
-        nav.classList.toggle('open');
-        btn.setAttribute('aria-expanded', String(willOpen));
-      });
-
-      // Close menu when clicking a link (mobile)
-      menu?.querySelectorAll('a').forEach(a => {
-        a.addEventListener('click', closeMenu);
-      });
-
-      // Close on escape
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeMenu();
-      });
-    })();
-  </script>
 </body>
 </html>

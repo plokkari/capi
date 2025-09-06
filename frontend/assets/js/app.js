@@ -1,184 +1,391 @@
-/* ===== starfield background ===== */
-(function stars(){
-  const c = document.querySelector('.stars');
+/* =========================
+   Starfield background
+========================= */
+(function(){
+  const c = document.querySelector('canvas.stars'); 
   if(!c) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d'); let w,h,stars=[];
   function resize(){
-    c.width = innerWidth * dpr;
-    c.height = innerHeight * dpr;
-    draw();
+    w = c.width = innerWidth;
+    h = c.height = innerHeight;
+    stars = Array.from({length:120}, () => ({
+      x: Math.random()*w,
+      y: Math.random()*h,
+      r: Math.random()*1.4 + 0.3,
+      s: Math.random()*0.6 + 0.2
+    }));
   }
   function draw(){
-    ctx.clearRect(0,0,c.width,c.height);
-    for(let i=0;i<150;i++){
-      const x = Math.random()*c.width;
-      const y = Math.random()*c.height;
-      const r = Math.random()*1.5+0.2;
-      ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.8})`;
-      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    ctx.clearRect(0,0,w,h);
+    for(const s of stars){
+      ctx.globalAlpha = 0.35 + Math.sin((performance.now()/1000)*s.s)*0.25;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  addEventListener('resize', resize);
+  resize(); draw();
+})();
+
+/* =========================
+   Loader (themed, gradient bar, rotating tips)
+========================= */
+document.addEventListener('DOMContentLoaded', ()=>{
+  const loader = document.getElementById('loader');
+  const fill   = document.getElementById('loadFill');
+  const textEl = document.getElementById('loadText');
+  const tipEl  = document.getElementById('loadTip');
+  if(!loader || !fill) return;
+
+  const tips = [
+    "Warming up Flappybara’s wings…",
+    "Counting $BARA one capy at a time…",
+    "Greasing arcade joysticks…",
+    "Polishing the leaderboard trophy…",
+    "Teaching capybaras to HODL…",
+    "Optimizing memes per second…",
+  ];
+  let tipIdx = 0;
+  function showNextTip(){
+    if(!tipEl) return;
+    tipEl.style.animation = 'none';
+    // force reflow to restart CSS animation
+    // eslint-disable-next-line no-unused-expressions
+    tipEl.offsetHeight;
+    tipEl.textContent = tips[tipIdx % tips.length];
+    tipEl.style.animation = '';
+    tipIdx++;
+  }
+  showNextTip();
+  const tipTimer = setInterval(showNextTip, 1100);
+
+  // ~2.4–3.2s eased progress
+  const total = 2400 + Math.random()*800;
+  const t0 = performance.now();
+
+  function tick(){
+    const elapsed = performance.now() - t0;
+    const t = Math.min(1, elapsed / total);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const pct = Math.floor(eased * 100);
+
+    fill.style.width = pct + '%';
+    if(textEl){
+      textEl.textContent = pct < 99 ? `LOADING ${pct}%` : 'READY!';
+    }
+
+    if (t < 1){
+      requestAnimationFrame(tick);
+    } else {
+      clearInterval(tipTimer);
+      loader.style.opacity='0';
+      setTimeout(()=> loader.style.display='none', 320);
     }
   }
-  resize(); addEventListener('resize', resize);
-})();
+  requestAnimationFrame(tick);
+});
 
-/* ===== loader (always on fresh load/refresh) ===== */
-(function loader(){
-  const wrap = document.getElementById('loader');
-  if(!wrap) return;
-  const fill = document.getElementById('loadFill');
-  const text = document.getElementById('loadText');
-  const tip  = document.getElementById('loadTip');
-  const tips = [
-    'Spawning flappy pipes…',
-    'Feeding capybaras…',
-    'Greasing Arcade joysticks…',
-    'Counting leaderboard tickets…',
-    'Warm-starting chart rockets…'
-  ];
-  tip.textContent = tips[Math.floor(Math.random()*tips.length)];
-  let p = 0;
-  const timer = setInterval(()=>{
-    p += Math.random()*18;
-    if(p > 100) p = 100;
-    fill.style.width = p+'%';
-    if(p >= 100){
-      clearInterval(timer);
-      setTimeout(()=> wrap.classList.add('hide'), 250);
-      setTimeout(()=> wrap.style.display='none', 800);
-    }
-  }, 220);
-})();
-
-/* ===== smooth reveal on scroll ===== */
+/* =========================
+   Reveal-on-scroll
+========================= */
 function initReveal(){
-  const els = document.querySelectorAll('.reveal');
   const io = new IntersectionObserver((entries)=>{
     entries.forEach(e=>{
-      if(e.isIntersecting){ e.target.classList.add('revealed'); io.unobserve(e.target); }
+      if(e.isIntersecting){
+        e.target.classList.add('show');
+        io.unobserve(e.target);
+      }
     });
-  }, { threshold: .1 });
-  els.forEach(el=>io.observe(el));
+  }, {threshold:0.15});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 }
 
-/* ===== nav pills + native smooth scrolling + active state ===== */
-function initSmoothLinks(){
-  const closeMobileNav = () => {
-    document.getElementById('siteNav')?.classList.remove('open');
-    document.getElementById('navToggle')?.setAttribute('aria-expanded', 'false');
-  };
+/* =========================
+   Hero parallax for #getBara
+========================= */
+function initParallax(){
+  const img = document.getElementById('getBara');
+  const home = document.getElementById('homeSection');
+  if(!img || !home) return;
 
-  document.querySelectorAll('.pill').forEach(a=>{
-    a.addEventListener('click', (e)=>{
-      const href = a.getAttribute('href') || '';
-      if (!href.startsWith('#')) return; // normal links
-
-      // DO NOT preventDefault — let the browser do native anchor scroll
-      closeMobileNav();
-
-      // update active state instantly
-      document.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
-      a.classList.add('active');
-    }, { passive:true });
-  });
+  let ticking = false;
+  function onScroll(){
+    if(!ticking){ requestAnimationFrame(update); ticking = true; }
+  }
+  function update(){
+    const rect = home.getBoundingClientRect();
+    const prog = Math.min(1, Math.max(0, (-rect.top)/(window.innerHeight*0.6)));
+    img.style.transform = `translateY(${prog*80}px)`;
+    img.style.opacity = (Math.max(0, 1 - prog*1.15)).toFixed(3);
+    ticking = false;
+  }
+  addEventListener('scroll', onScroll, {passive:true});
+  update();
 }
 
+/* =========================
+   Scroll-spy (highlight nav pill)
+========================= */
 function initScrollSpy(){
-  const secs = ['#home','#about','#arcade','#how','#faq']
+  const sections = ['#home','#about','#arcade','#roadmap','#faq','#socials']
     .map(s=>document.querySelector(s)).filter(Boolean);
+
   addEventListener('scroll', ()=>{
     const y = scrollY + 120;
     let current = '#home';
-    secs.forEach(s=>{ if(s && y >= s.offsetTop) current = '#'+s.id; });
+    sections.forEach(s=>{ if(s && y >= s.offsetTop) current = '#'+s.id; });
     document.querySelectorAll('.pill').forEach(b=>{
       b.classList.toggle('active', (b.getAttribute('href') === current));
     });
-  }, { passive:true });
+  });
+}
+   
+/* =========================
+   Smooth scroll for same-page anchors
+========================= */
+function initSmoothLinks(){
+  document.querySelectorAll('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click', (e)=>{
+      const targetId = a.getAttribute('href');
+      const el = document.querySelector(targetId);
+      if(el){
+        e.preventDefault();
+        window.scrollTo({ top: el.offsetTop - 70, behavior:'smooth' });
+      }
+    });
+  });
 }
 
-/* ===== parallax of GET $BARA image ===== */
-function initParallax(){
-  const img = document.getElementById('getBara');
-  const scene = document.querySelector('.hero-scene');
-  if(!img || !scene) return;
-  function onScroll(){
-    const rect = scene.getBoundingClientRect();
-    const t = Math.min(Math.max((0 - rect.top) / 300, -1), 1);
-    img.style.transform = `translateY(${t*40}px)`;
-  }
-  addEventListener('scroll', onScroll, { passive:true });
-  onScroll();
-}
-
-/* ===== meme chart (placeholder random walk; hook to live later) ===== */
+/* =========================
+   Meme Chart (placeholder live wiggle)
+========================= */
 function initMemeChart(){
-  const el = document.getElementById('memeChart'); if(!el || !window.Chart) return;
-  const wrap = el.parentElement;
-  const h = wrap ? wrap.clientHeight : 260;
+  const el = document.getElementById('memeChart');
+  if(!el || !window.Chart) return;
+
+  const wrap = el.parentElement;               // .chart-wrap
+  const h = wrap ? wrap.clientHeight : 320;    // gradient height
+  const priceEl = document.getElementById('memePrice');
+  const deltaEl = document.getElementById('memeDelta');
+  const tfBtns  = document.querySelectorAll('.chip.tf');
+
   const ctx = el.getContext('2d');
-  let grad = ctx.createLinearGradient(0,0,0,h);
-  grad.addColorStop(0,'rgba(122,92,255,.45)');
-  grad.addColorStop(1,'rgba(122,92,255,0)');
 
-  const labels = Array.from({length:80}, (_,i)=>i.toString());
-  let v = 0.00012;
-  const data = labels.map(()=> (v += (Math.random()-0.5)*v*0.15, v = Math.max(v, 0.00001)));
+  // gradient fill sized to wrapper
+  let grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(122,92,255,.45)');
+  grad.addColorStop(1, 'rgba(122,92,255,0)');
 
-  const chart = new Chart(ctx,{
-    type:'line',
-    data:{ labels, datasets:[{ data, borderColor:'#9ecbff', borderWidth:2, tension:.35, fill:true, backgroundColor:grad, pointRadius:0 }]},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      scales:{ x:{display:false}, y:{display:false, grace:'8%'} },
-      plugins:{ legend:{display:false}, tooltip:{enabled:false} },
-      animation:{ duration:220 }
+  // seed data (random walk)
+  const N = 40;
+  let base = 0.000123;
+  let speed = 1.0;
+  const data = [];
+  for(let i=0;i<N;i++){
+    base += (Math.random()-0.5) * 0.000003;
+    data.push(Math.max(0, base));
+  }
+  const labels = Array.from({length:N}, (_,i)=> i.toString());
+
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#9ecbff',
+        borderWidth: 2,
+        tension: 0.35,
+        fill: true,
+        backgroundColor: grad,
+        pointRadius: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { x: { display:false }, y: { display:false, grace: '8%' } },
+      plugins: { legend: { display:false }, tooltip: { enabled:false } },
+      animation: { duration: 220 }
     }
   });
 
-  const priceEl = document.getElementById('memePrice');
-  const deltaEl = document.getElementById('memeDelta');
+  // refresh gradient once chart sizes to device pixels
+  setTimeout(()=>{
+    const h2 = wrap ? wrap.clientHeight : 320;
+    grad = ctx.createLinearGradient(0, 0, 0, h2);
+    grad.addColorStop(0, 'rgba(122,92,255,.45)');
+    grad.addColorStop(1, 'rgba(122,92,255,0)');
+    chart.data.datasets[0].backgroundColor = grad;
+    chart.update('none');
+  }, 0);
+
+  function fmt(n){ return '$' + n.toFixed(6); }
   function updateUI(){
-    const ds = chart.data.datasets[0].data;
-    const last = ds.at(-1), first = ds[0];
-    const chg = first ? ((last-first)/first)*100 : 0;
-    priceEl.textContent = '$'+Number(last).toFixed(6);
-    deltaEl.textContent = (chg>=0?'+':'')+chg.toFixed(2)+'%';
+    const last = chart.data.datasets[0].data.at(-1);
+    const first= chart.data.datasets[0].data[0];
+    const chg  = ((last - first) / first) * 100;
+
+    priceEl.textContent = fmt(last);
+    deltaEl.textContent = (chg>=0? '+' : '') + chg.toFixed(2) + '%';
     deltaEl.classList.toggle('up', chg>=0);
     deltaEl.classList.toggle('down', chg<0);
+
     chart.data.datasets[0].borderColor = chg>=0 ? '#6BFF9D' : '#ff7f7f';
   }
-  updateUI();
 
-  let speed = 1.0;
-  document.querySelectorAll('.chip.tf').forEach(b=>{
-    b.addEventListener('click', ()=>{
-      document.querySelectorAll('.chip.tf').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      speed = parseFloat(b.dataset.speed || '1');
+  let timer;
+  function start(){
+    stop();
+    timer = setInterval(()=>{
+      const last = chart.data.datasets[0].data.at(-1);
+      const next = Math.max(0, last + (Math.random()-0.5) * 0.000003 * speed);
+      chart.data.datasets[0].data.push(next);
+      chart.data.datasets[0].data.shift();
+      chart.update('none');
+      updateUI();
+    }, 950);
+  }
+  function stop(){ if(timer) clearInterval(timer); }
+
+  tfBtns.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      tfBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      speed = parseFloat(btn.dataset.speed || '1');
     });
   });
 
-  function tick(){
-    const last = chart.data.datasets[0].data.at(-1);
-    let next = last + (Math.random()-0.5)*last*0.12;
-    next = Math.max(next, 0.0000001);
-    chart.data.labels.push((chart.data.labels.length+1).toString());
-    chart.data.datasets[0].data.push(next);
-    while(chart.data.labels.length > 100){ chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
-    chart.update('none');
-    updateUI();
-    setTimeout(tick, 1100 / speed);
-  }
-  tick();
+  updateUI(); start();
 }
 
-/* ===== boot ===== */
+/* =========================
+   Boot on page view
+========================= */
 function boot(){
   initReveal();
   initParallax();
   initScrollSpy();
-  initSmoothLinks();  // <- now lets native anchors do the scroll
+  initSmoothLinks();
   initMemeChart();
 }
 
-document.addEventListener('DOMContentLoaded', boot);
+/* =========================
+   Swup page transitions
+========================= */
+document.addEventListener('DOMContentLoaded', ()=>{
+  if(window.Swup){
+    const swup = new Swup({ containers:['#swup'], animateHistoryBrowsing:true });
+    swup.hooks.on('page:view', boot);
+  }
+  boot();
+});
+
+/* -------------------- Starfield -------------------- */
+(function(){
+  const canvas = document.querySelector('canvas.stars');
+  if(!canvas) return;
+
+  const ctx = canvas.getContext('2d', { alpha: true });
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+  let w = 0, h = 0, stars = [];
+  const STAR_COUNT = 180;           // tweak density
+  const TWINKLE_SPEED = 0.0026;     // lower = slower twinkle
+  const PARALLAX = 0.02;            // subtle camera sway
+  let mouseX = 0, mouseY = 0, t = 0;
+
+  function resize(){
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    const cssW = canvas.clientWidth || window.innerWidth;
+    const cssH = canvas.clientHeight || window.innerHeight;
+    w = Math.floor(cssW * dpr);
+    h = Math.floor(cssH * dpr);
+    canvas.width  = w;
+    canvas.height = h;
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.scale(dpr, dpr);
+    // (Re)seed stars if empty or after a big resize
+    if (!stars.length || stars.length < STAR_COUNT * 0.9) seed();
+  }
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+
+  function seed(){
+    stars = Array.from({length: STAR_COUNT}, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: rand(0.6, 1.8),         // radius in CSS pixels (we scale via dpr)
+      p: rand(0, Math.PI*2),     // twinkle phase
+      s: rand(0.3, 1.0)          // brightness scale
+    }));
+  }
+
+  function draw(){
+    t += 1; // frame counter
+    const cw = canvas.clientWidth || window.innerWidth;
+    const ch = canvas.clientHeight || window.innerHeight;
+
+    // parallax offset (in CSS px), then we draw in CSS space (ctx scaled already)
+    const px = (mouseX - cw/2) * PARALLAX;
+    const py = (mouseY - ch/2) * PARALLAX;
+
+    // clear with transparent-ish fill to keep background gradients visible
+    ctx.clearRect(0, 0, cw, ch);
+
+    for(const st of stars){
+      const x = st.x * cw + px;
+      const y = st.y * ch + py;
+
+      // twinkle between 0.35 and st.s
+      const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(st.p + t * TWINKLE_SPEED));
+      ctx.globalAlpha = a * st.s;
+
+      // soft glow
+      ctx.beginPath();
+      ctx.arc(x, y, st.r, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(209, 223, 255, 0.95)'; // star core
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(x, y, st.r*2.2, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(140, 170, 255, 0.10)'; // halo
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    raf = requestAnimationFrame(draw);
+  }
+
+  let raf;
+  function start(){
+    cancelAnimationFrame(raf);
+    resize();
+    draw();
+  }
+
+  // mouse parallax
+  window.addEventListener('mousemove', (e)=>{
+    mouseX = e.clientX; mouseY = e.clientY;
+  });
+
+  // resize / orientation / DPR changes
+  let rAF;
+  const onResize = ()=>{ cancelAnimationFrame(rAF); rAF = requestAnimationFrame(resize); };
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+
+  // run immediately so it’s visible behind the loader
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+
+  // Optional: pause when tab hidden to save CPU
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden) cancelAnimationFrame(raf);
+    else draw();
+  });
+})();
