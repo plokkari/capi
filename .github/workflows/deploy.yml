@@ -1,78 +1,49 @@
-name: Build & Deploy Flappy Capy
+name: Build & Deploy Full Site
+
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install pygbag
-        run: python -m pip install --upgrade pygbag
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
 
-      - name: Build web with auto-start (ume_block=0)
-        working-directory: game
+      - name: Install pygbag (PyPI latest)
+        run: pip install pygbag==0.9.2
+
+      # Build the game INSIDE frontend/game → outputs to frontend/game/build/web
+      - name: Build game with pygbag
+        working-directory: frontend/game
         run: python -m pygbag --ume_block 0 --build main.py
 
-      - name: Inject forwarder.js into build/web/index.html
-        working-directory: game
-        shell: bash
-        run: |
-          F="build/web/index.html"
-          TAG='<script src="../../forwarder.js"></script>'
-          if ! grep -q 'forwarder.js' "$F"; then
-            awk -v tag="$TAG" '
-              /<\/body>/ && !done { print "  <!-- injected: forwarder.js -->\n  " tag; done=1 }
-              { print }
-            ' "$F" > "$F.tmp" && mv "$F.tmp" "$F"
-            echo "Injected forwarder.js"
-          else
-            echo "forwarder already injected"
-          fi
-
-      # Optional: cache-bust the iframe src inside /game/index.html
-      - name: Cache-buster (?v=timestamp) in game/index.html
-        shell: bash
-        run: |
-          python - "$@" <<'PY'
-          import re, time, pathlib
-          p = pathlib.Path("game/index.html")
-          if not p.exists():
-              print("game/index.html not found; skipping")
-              raise SystemExit(0)
-          s = p.read_text(encoding="utf-8")
-          new = re.sub(r'(build/web/index\.html)(?:\?v=[^"\'\s]*)?', r'\1?v=%d' % int(time.time()), s)
-          if new != s:
-              p.write_text(new, encoding="utf-8")
-              print("Cache-buster updated in game/index.html")
-          else:
-              print("No build/web reference found; skipping")
-          PY
-
-      # Publish the whole repo so /game and root files (CNAME) are served
-      - name: Upload site
+      # Upload the WHOLE frontend as the Pages artifact (root = frontend/)
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: frontend
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
