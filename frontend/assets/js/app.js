@@ -283,3 +283,109 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   boot();
 });
+
+/* -------------------- Starfield -------------------- */
+(function(){
+  const canvas = document.querySelector('canvas.stars');
+  if(!canvas) return;
+
+  const ctx = canvas.getContext('2d', { alpha: true });
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+  let w = 0, h = 0, stars = [];
+  const STAR_COUNT = 180;           // tweak density
+  const TWINKLE_SPEED = 0.0026;     // lower = slower twinkle
+  const PARALLAX = 0.02;            // subtle camera sway
+  let mouseX = 0, mouseY = 0, t = 0;
+
+  function resize(){
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    const cssW = canvas.clientWidth || window.innerWidth;
+    const cssH = canvas.clientHeight || window.innerHeight;
+    w = Math.floor(cssW * dpr);
+    h = Math.floor(cssH * dpr);
+    canvas.width  = w;
+    canvas.height = h;
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.scale(dpr, dpr);
+    // (Re)seed stars if empty or after a big resize
+    if (!stars.length || stars.length < STAR_COUNT * 0.9) seed();
+  }
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+
+  function seed(){
+    stars = Array.from({length: STAR_COUNT}, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: rand(0.6, 1.8),         // radius in CSS pixels (we scale via dpr)
+      p: rand(0, Math.PI*2),     // twinkle phase
+      s: rand(0.3, 1.0)          // brightness scale
+    }));
+  }
+
+  function draw(){
+    t += 1; // frame counter
+    const cw = canvas.clientWidth || window.innerWidth;
+    const ch = canvas.clientHeight || window.innerHeight;
+
+    // parallax offset (in CSS px), then we draw in CSS space (ctx scaled already)
+    const px = (mouseX - cw/2) * PARALLAX;
+    const py = (mouseY - ch/2) * PARALLAX;
+
+    // clear with transparent-ish fill to keep background gradients visible
+    ctx.clearRect(0, 0, cw, ch);
+
+    for(const st of stars){
+      const x = st.x * cw + px;
+      const y = st.y * ch + py;
+
+      // twinkle between 0.35 and st.s
+      const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(st.p + t * TWINKLE_SPEED));
+      ctx.globalAlpha = a * st.s;
+
+      // soft glow
+      ctx.beginPath();
+      ctx.arc(x, y, st.r, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(209, 223, 255, 0.95)'; // star core
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(x, y, st.r*2.2, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(140, 170, 255, 0.10)'; // halo
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    raf = requestAnimationFrame(draw);
+  }
+
+  let raf;
+  function start(){
+    cancelAnimationFrame(raf);
+    resize();
+    draw();
+  }
+
+  // mouse parallax
+  window.addEventListener('mousemove', (e)=>{
+    mouseX = e.clientX; mouseY = e.clientY;
+  });
+
+  // resize / orientation / DPR changes
+  let rAF;
+  const onResize = ()=>{ cancelAnimationFrame(rAF); rAF = requestAnimationFrame(resize); };
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+
+  // run immediately so it’s visible behind the loader
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+
+  // Optional: pause when tab hidden to save CPU
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden) cancelAnimationFrame(raf);
+    else draw();
+  });
+})();

@@ -19,15 +19,26 @@
   <!-- starfield backdrop -->
   <canvas class="stars" aria-hidden="true"></canvas>
 
-  <!-- LOADER (shows on every fresh load/refresh) -->
-  <div id="loader" class="loader" aria-live="polite">
-    <div class="load-card">
-      <img class="load-gif" src="./assets/img/loader.gif" alt="Loading..." />
-      <div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
-      <div class="load-text" id="loadText">ALMOST READY…</div>
-      <div class="load-tip" id="loadTip"></div>
-    </div>
+
+   <!-- Loader decor (goes inside #loader, sibling to .load-card) -->
+<!-- Loader overlay -->
+<div id="loader" class="loader" aria-live="polite">
+  <!-- decor must be INSIDE the loader -->
+  <div class="loader-decor" aria-hidden="true">
+    <div class="ring"></div>
+    <span class="dot d1"></span>
+    <span class="dot d2"></span>
+    <span class="dot d3"></span>
   </div>
+
+  <div class="load-card">
+    <img class="load-gif" src="./assets/img/loader.gif" alt="Loading..." />
+    <div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
+    <div class="load-text" id="loadText">LOADING…</div>
+    <div class="load-tip"  id="loadTip"></div>
+  </div>
+</div>
+
 
   <!-- NAV -->
   <nav class="nav">
@@ -85,8 +96,10 @@
               </div>
 
               <div class="chart-wrap">
-                <canvas id="memeChart" aria-label="price chart"></canvas>
-              </div>
+  <canvas id="memeChart" aria-label="price chart"></canvas>
+  <div class="chart-note">Demo data — live chart unlocks at launch</div>
+</div>
+
 
               <div class="chart-foot">
                 <div class="price" id="memePrice">$0.000000</div>
@@ -123,10 +136,10 @@
       <div class="page">
         <h3>What Makes $BARA Different</h3>
         <p class="muted">
-          🎮 <b>Play-to-Earn Arcade</b> — Weekly prize pools for top players.<br/>
-          🐹 <b>Community First</b> — Fun over over-complicated tokenomics.<br/>
-          🎨 <b>NFT Perks (later)</b> — Cosmetics & access; never pay-to-win.<br/>
-          🔒 <b>Simple & Transparent</b> — 0% buy/sell tax, clear supply, renounced contract.
+           <b>Play-to-Earn Arcade</b> — Weekly prize pools for top players.<br/>
+           <b>Community First</b> — Fun over over-complicated tokenomics.<br/>
+           <b>NFT Perks (later)</b> — Cosmetics & access; never pay-to-win.<br/>
+           <b>Simple & Transparent</b> — 0% buy/sell tax, clear supply, renounced contract.
         </p>
       </div>
       <div class="page">
@@ -142,33 +155,59 @@
 
 
       <!-- SCENE 3: ARCADE -->
-      <section class="scene" id="arcade">
-        <div class="container reveal">
-          <h2 class="section-title">Arcade</h2>
-          <div class="card">
-            <div class="carousel">
-              <div class="game">
-                <div class="thumb"></div>
-                <h4>Flappybara 🐹</h4>
-                <p class="muted">Tap to dodge. Weekly prizes.</p>
-                <button class="play" onclick="alert('Open Flappybara')">Play</button>
-              </div>
-              <div class="game">
-                <div class="thumb"></div>
-                <h4>Capy Dash</h4>
-                <p class="muted">Endless runner prototype.</p>
-                <button class="play" onclick="alert('Coming soon')">Preview</button>
-              </div>
-              <div class="game">
-                <div class="thumb"></div>
-                <h4>Bararena</h4>
-                <p class="muted">1v1 mini-duels.</p>
-                <button class="play" onclick="alert('Coming soon')">Preview</button>
-              </div>
-            </div>
-          </div>
+<section class="scene" id="arcade">
+  <div class="container reveal">
+    <h2 class="section-title">Arcade</h2>
+
+    <div class="arcade-row">
+
+      <!-- GAME 1 — Flappybara (live) -->
+      <article class="game-card">
+        <div class="thumb">
+          <img src="assets/img/bara-fly.png" alt="Flappybara preview" />
         </div>
-      </section>
+        <header class="game-head">
+          <h4 class="game-title">Flappybara <span class="emoji">🧸</span></h4>
+          <p class="muted">Tap to dodge. Weekly prizes.</p>
+        </header>
+        <div class="game-actions">
+          <button class="btn primary" onclick="window.location.href='game/index.html'">Play</button>
+        </div>
+      </article>
+
+      <!-- GAME 2 — Coming soon -->
+      <article class="game-card soon">
+        <div class="thumb">
+          <span class="ribbon">COMING SOON</span>
+        </div>
+        <header class="game-head">
+          <h4 class="game-title">TBA</h4>
+          <p class="muted">New title arriving after launch.</p>
+        </header>
+        <div class="game-actions">
+          <button class="btn" disabled>Coming soon</button>
+        </div>
+      </article>
+
+      <!-- GAME 3 — Coming soon -->
+      <article class="game-card soon">
+        <div class="thumb">
+          <span class="ribbon">COMING SOON</span>
+        </div>
+        <header class="game-head">
+          <h4 class="game-title">TBA</h4>
+          <p class="muted">Revealed with the community.</p>
+        </header>
+        <div class="game-actions">
+          <button class="btn" disabled>Coming soon</button>
+        </div>
+      </article>
+
+    </div><!-- /.arcade-row -->
+  </div><!-- /.container -->
+</section>
+
+
 
       <section class="scene" id="roadmap">
   <div class="container reveal">
@@ -182,7 +221,6 @@
           • First $BARA arcade game released<br/>
           • Leaderboards + weekly rewards enabled<br/>
           • Community building on Telegram / X<br/>
-          • Contract deployment & liquidity planned late in Phase 1
         </p>
       </div>
 
@@ -191,7 +229,6 @@
         <p class="muted">
           • Full token deployment & trading<br/>
           • Bigger weekly rewards and optimizations<br/>
-          • NFT teaser drop (cosmetics/perks)<br/>
           • Next arcade title announcement
         </p>
       </div>
@@ -201,7 +238,6 @@
         <p class="muted">
           • New games (revealed with the community)<br/>
           • Seasonal tournaments & events<br/>
-          • NFT integration + cosmetic marketplace<br/>
           • Partner collaborations for cross-token rewards
         </p>
       </div>
@@ -250,7 +286,7 @@
       <details class="item">
         <summary>Will there be NFTs?</summary>
         <div class="content">
-          Yes — NFTs arrive later with cosmetics and perks (never pay-to-win).
+          Yes — NFTs arrive later with cosmetics and perks.
         </div>
       </details>
 
@@ -279,15 +315,57 @@
         <div class="container reveal socials">
           <h2 class="section-title">Socials</h2>
           <div class="ring">
-            <a class="icon" style="--i:0" href="#" title="X">X</a>
-            <a class="icon" style="--i:1" href="#" title="Telegram">TG</a>
-            <a class="icon" style="--i:2" href="#" title="Discord">DC</a>
-            <a class="icon" style="--i:3" href="#" title="YouTube">YT</a>
-            <a class="icon" style="--i:4" href="#" title="Spotify">SP</a>
-            <a class="icon" style="--i:5" href="#" title="Instagram">IG</a>
-            <a class="icon" style="--i:6" href="#" title="Website">WB</a>
-            <a class="icon" style="--i:7" href="#" title="GitHub">GH</a>
-          </div>
+  <!-- Center medallion -->
+  <div class="ring">
+  <!-- Center medallion -->
+  <div class="ring-center">
+    <span class="brand">$BARA</span>
+    <span class="tag">Join us</span>
+  </div>
+
+  <!-- Index map (clockwise, starting at TOP):
+       0 = top, 1 = top-right, 2 = right, 3 = bottom-right,
+       4 = bottom, 5 = bottom-left, 6 = left, 7 = top-left -->
+
+  <!-- 0 TOP: X -->
+  <a class="icon" style="--i:0" href="https://twitter.com/your-handle" target="_blank" rel="noopener">X</a>
+
+  <!-- 1: orb -->
+  <span class="icon ghost" style="--i:1"></span>
+
+  <!-- 2 RIGHT: TG -->
+  <a class="icon" style="--i:2" href="https://t.me/your-channel" target="_blank" rel="noopener">TG</a>
+
+  <!-- 3: orb -->
+  <span class="icon ghost" style="--i:3"></span>
+
+  <!-- 4 BOTTOM: DEX -->
+  <a class="icon" style="--i:4" href="https://dexscreener.com/yourpair" target="_blank" rel="noopener">DEX</a>
+
+  <!-- 5: orb -->
+  <span class="icon ghost" style="--i:5"></span>
+
+  <!-- 6 LEFT: TikTok -->
+  <a class="icon" style="--i:6" href="https://www.tiktok.com/@your-handle" target="_blank" rel="noopener">TT</a>
+
+  <!-- 7: orb -->
+  <span class="icon ghost" style="--i:7"></span>
+</div>
+
+
+  <!-- Real links -->
+  <a class="icon" style="--i:0" href="https://twitter.com/..." target="_blank" rel="noopener">X</a>
+  <a class="icon" style="--i:1" href="https://t.me/..." target="_blank" rel="noopener">TG</a>
+  <a class="icon" style="--i:2" href="https://dexscreener.com/..." target="_blank" rel="noopener">DEX</a>
+
+  <!-- Empty spots -> gradient orbs (placeholders) -->
+  <span class="icon ghost" style="--i:3"></span>
+  <span class="icon ghost" style="--i:4"></span>
+  <span class="icon ghost" style="--i:5"></span>
+  <span class="icon ghost" style="--i:6"></span>
+  <span class="icon ghost" style="--i:7"></span>
+</div>
+
         </div>
       </section>
     </main>
