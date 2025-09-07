@@ -109,6 +109,28 @@
       .scene .container { padding-left:12px; padding-right:12px; }
     }
 
+    /* =======================================
+       Mascot fade fully in/out on scroll
+       ======================================= */
+    /* start invisible, then become fully opaque when .visible is set by JS */
+    #getBara.hero-floater {
+      opacity: 0;
+      transition: opacity .6s ease;
+      pointer-events: none;
+    }
+    #getBara.hero-floater.visible {
+      opacity: 1; /* fully visible (not transparent) */
+    }
+
+    /* =======================================
+       Loader fade-out helper class
+       ======================================= */
+    .loader.fade-out {
+      opacity: 0;
+      transition: opacity .6s ease;
+      pointer-events: none;
+    }
+
     /* Prevent horizontal scroll on mobile */
     html, body { overflow-x:hidden; }
   </style>
@@ -398,7 +420,7 @@
         <div class="container reveal">
           <h2 class="section-title">FAQ</h2>
 
-          <div class="faq">
+        <div class="faq">
             <details class="item" open>
               <summary>What is $BARA?</summary>
               <div class="content">
@@ -463,7 +485,7 @@
             <!-- Links around the ring -->
             <a class="icon" style="--i:0" href="https://twitter.com/your-handle" target="_blank" rel="noopener">X</a>
             <span class="icon ghost" style="--i:1"></span>
-            <a class="icon" style="--i:2" href="https://t.me/your-channel" target="_blank" rel="noopener">TG</a>
+            <a class="icon" style="--i:2" href="https://t.me/baracoiin" target="_blank" rel="noopener">TG</a>
             <span class="icon ghost" style="--i:3"></span>
             <a class="icon" style="--i:4" href="https://dexscreener.com/yourpair" target="_blank" rel="noopener">DEX</a>
             <span class="icon ghost" style="--i:5"></span>
@@ -560,46 +582,48 @@
     })();
   </script>
 
-  <!-- Optional: fade out the loader when content is ready -->
+  <!-- Loader: enforce a minimum visible duration + smooth fade-out -->
+  <script>
+    window.addEventListener("load", () => {
+      const loader = document.getElementById("loader");
+      if (!loader) return;
+
+      // Minimum display duration (ms)
+      const minDuration = 1500; // 👈 tweak to 2000 for 2s if you want longer
+
+      setTimeout(() => {
+        loader.classList.add("fade-out");     // trigger CSS fade
+        // remove from DOM after fade completes
+        setTimeout(() => loader.remove(), 650);
+      }, minDuration);
+    });
+  </script>
+
+  <!-- Mascot visibility controller (fade fully in/out with IntersectionObserver) -->
   <script>
     (function () {
-      function hideLoader() {
-        const loader = document.getElementById('loader');
-        if (!loader) return;
-        loader.style.transition = 'opacity .35s ease';
-        loader.style.opacity = '0';
-        setTimeout(() => loader.style.display = 'none', 400);
-      }
+      const mascot = document.getElementById('getBara');
+      const hero   = document.getElementById('homeSection');
 
-      // When DOM ready
-      if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(hideLoader, 50);
-      } else {
-        document.addEventListener('DOMContentLoaded', () => setTimeout(hideLoader, 50));
+      if (mascot && hero && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(
+          entries => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                mascot.classList.add('visible');   // fade to 100% opacity
+              } else {
+                mascot.classList.remove('visible'); // fade to 0
+              }
+            });
+          },
+          { threshold: 0.4 } // visible if 40% of hero in view
+        );
+        observer.observe(hero);
+      } else if (mascot) {
+        // Fallback: show mascot if no IO support
+        mascot.classList.add('visible');
       }
     })();
-
-    (function () {
-    const mascot = document.getElementById('getBara');
-    const hero   = document.getElementById('homeSection');
-
-    if (mascot && hero) {
-      const observer = new IntersectionObserver(
-        entries => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              mascot.classList.add('visible');   // fade in
-            } else {
-              mascot.classList.remove('visible'); // fade out
-            }
-          });
-        },
-        { threshold: 0.4 } // visible if 40% of hero in view
-      );
-      observer.observe(hero);
-    }
-  })();
-
   </script>
 
 </body>
