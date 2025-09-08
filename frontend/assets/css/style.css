@@ -46,6 +46,21 @@ canvas.stars{position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.2
   background:linear-gradient(90deg, var(--grad-a), var(--grad-b)); color:#0a0a12;
   box-shadow:0 6px 18px rgba(122,92,255,.25), 0 6px 18px rgba(78,210,255,.2)}
 
+ .logo { display:flex; align-items:center; text-decoration:none; }
+.logo-img{
+  height:70px;             /* adjust if you want it larger/smaller */
+  width:auto;
+  display:block;
+  filter: drop-shadow(0 0 6px rgba(186,122,255,.7));
+  transition: transform .2s ease, filter .2s ease;
+}
+.logo-img:hover{
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 12px rgba(186,122,255,1));
+}
+
+
+
 .pill-nav{
   justify-self:center;
   display:flex; gap:8px; padding:6px; border-radius:999px;
