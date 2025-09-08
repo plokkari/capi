@@ -416,13 +416,14 @@ background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
 
 capy_img = load_img("flappy capy.png")
 capy_img = pygame.transform.scale(capy_img, (60, 45))
-capy_rect = pygame.Rect(0, 0, 40, 30)
+capy_rect = pygame.Rect(0, 0, 30, 20)
 capy_rect.center = (100, HEIGHT // 2)
 
 # =========================
 #  PILLARS
 # =========================
 OBSTACLE_WIDTH = 60
+OBSTACLE_HITBOX_INSET_X = 8   # pixels trimmed from each side for fair collisions
 SCROLL_SPEED   = 150
 SPAWN_OFFSET_X = WIDTH + 60
 OBSTACLE_SPACING_X = 150   # phone-friendly spacing (was 130)
@@ -494,8 +495,10 @@ def draw_obstacles():
 
 def obstacle_hitboxes(ob):
     x = int(ob["x"]); gap_y = ob["gap_y"]; gap_size = ob["gap_size"]
-    top_rect = pygame.Rect(x,0,OBSTACLE_WIDTH,gap_y-gap_size//2)
-    bottom_rect = pygame.Rect(x,gap_y+gap_size//2,OBSTACLE_WIDTH,HEIGHT-(gap_y+gap_size//2))
+    inset = OBSTACLE_HITBOX_INSET_X
+    w = max(2, OBSTACLE_WIDTH - 2*inset)
+    top_rect    = pygame.Rect(x + inset, 0, w, gap_y - gap_size//2)
+    bottom_rect = pygame.Rect(x + inset, gap_y + gap_size//2, w, HEIGHT - (gap_y + gap_size//2))
     return top_rect, bottom_rect
 
 def check_collision_single_column():
