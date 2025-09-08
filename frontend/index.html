@@ -142,25 +142,22 @@
        ======================================= -->
   <canvas class="stars" aria-hidden="true"></canvas>
 
-  <!-- =======================================
-       Loader overlay (kept intact)
-       ======================================= -->
-  <div id="loader" class="loader" aria-live="polite">
-    <!-- decor must be INSIDE the loader -->
-    <div class="loader-decor" aria-hidden="true">
-      <div class="ring"></div>
-      <span class="dot d1"></span>
-      <span class="dot d2"></span>
-      <span class="dot d3"></span>
+  <!-- LOADER -->
+<div id="loader" class="loader" aria-live="polite">
+  <div class="load-card">
+    <img class="load-gif" src="./assets/img/loader.gif" alt="Loading..." />
+    <div class="load-frame">
+      <div class="load-bar">
+        <div class="load-fill" id="loadFill"></div>
+        <div class="load-mask"></div>
+      </div>
     </div>
-
-    <div class="load-card">
-      <img class="load-gif" src="./assets/img/loader.gif" alt="Loading..." />
-      <div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
-      <div class="load-text" id="loadText">LOADING…</div>
-      <div class="load-tip"  id="loadTip"></div>
-    </div>
+    <div class="load-text" id="loadText">LOADING 0%</div>
+    <div class="load-tip" id="loadTip">Counting $BARA one capy at a time…</div>
   </div>
+</div>
+
+
 
   <!-- =======================================
        NAV
@@ -177,7 +174,7 @@
         <a class="pill" href="#homeSection">Home</a>
         <a class="pill" href="#about">About</a>
         <a class="pill" href="#arcade">Arcade</a>
-        <a class="pill" href="#how">How to Buy</a>
+        <a class="pill" href="#roadmap">Roadmap</a>
         <a class="pill" href="#faq">FAQ</a>
         <a class="pill" href="#socials">Socials</a>
       </div>
@@ -339,31 +336,7 @@
         </div><!-- /.container -->
       </section>
 
-      <!-- ===========================
-           SCENE 4: HOW TO BUY
-           =========================== -->
-      <section class="scene" id="how">
-        <div class="container reveal">
-          <h2 class="section-title">How to Buy</h2>
-
-          <div class="steps">
-            <div class="step">
-              <b>1) Get a Wallet</b><br />
-              <span class="muted">Phantom or Backpack on Solana.</span>
-            </div>
-
-            <div class="step">
-              <b>2) Fund with SOL</b><br />
-              <span class="muted">On-ramp or CEX → send to wallet.</span>
-            </div>
-
-            <div class="step">
-              <b>3) Swap for $BARA</b><br />
-              <span class="muted">Use our quick swap (soon) or Jupiter.</span>
-            </div>
-          </div>
-        </div>
-      </section>
+    
 
       <!-- ===========================
            SCENE 5: ROADMAP (kept)
