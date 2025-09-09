@@ -114,6 +114,13 @@ def reset_run_flag():
     _RUN_STARTED = False
     score_sent = False
 
+def notify_checkpoint(score: int):
+    """Call whenever score increments, to prove progress."""
+    try:
+        _post_to_parent({"type": "SCORE_TICK", "score": int(score)})
+    except Exception:
+        pass
+
 # =========================
 #  SETUP
 # =========================
@@ -122,7 +129,7 @@ WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Flappy Bara 🐹")
 # --- Game version (shown only on the start screen) ---
-GAME_VERSION = "v0.2.1"
+GAME_VERSION = "v0.2.2"
 
 
 # =========================
@@ -932,10 +939,19 @@ while True:
 
         for ob in obstacles:
             if (not ob["scored"]) and (ob["x"]+OBSTACLE_WIDTH) < capy_rect.left:
-                score += 1; ob["scored"] = True
+                score += 1
+                ob["scored"] = True
+                try:
+                    notify_checkpoint(score)
+                except Exception:
+                    pass
                 if SOUND_ENABLED and (not is_muted) and SFX_REWARD:
-                    try: SFX_REWARD.play()
-                    except: pass
+                    try:
+                        SFX_REWARD.play()
+                    except:
+                        pass
+
+
 
         if score >= next_challenge_at: start_challenge()
         score_display("main")
