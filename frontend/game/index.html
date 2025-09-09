@@ -405,32 +405,56 @@
     loadBoard();
 
     /* === SCORE FLOW === */
+    // --- Checkpoint state ---
+    let currentTokenId = null;
+    let currentUserId  = null;
+    let lastCheckpointSent = 0;
+    const CHECKPOINT_STEP = 5; // send a checkpoint at 1,5,10,15,...
+
     const MIN = 1.30; // must match DB trigger/validation
     const tokenFrom = (d) => { if (Array.isArray(d)) d = d[0]; return d?.token ?? d?.id ?? d; };
 
     const G = { state:'IDLE', token:null, startAt:0, best:0, timer:null, lastStart:0 };
     const reset = () => { G.state='IDLE'; G.token=null; G.startAt=0; G.best=0; if (G.timer){clearTimeout(G.timer); G.timer=null;} };
 
-    async function onRunStart() {
-      const now = Date.now();
-      if (now - G.lastStart < 800) return; // debounce bursts
-      G.lastStart = now;
-      if (G.state !== 'IDLE') return;
+      async function onRunStart() {
+    const now = Date.now();
+    if (now - G.lastStart < 400) return;  // was 800; make it easier to start
+    G.lastStart = now;
 
-      const { data:{ user } = {} } = await sb.auth.getUser();
-      if (!user) return log("Not signed in");
-
-      const { data, error } = await sb.rpc("start_run");
-      if (error) { log("start_run error:", error.message || error); return; }
-
-      G.token   = tokenFrom(data);
-      G.startAt = performance.now();
-      G.best    = 0;
-      G.state   = 'WAITING';
-      log("minted token", G.token);
-
-      hideTapOverlay();
+    // If we somehow weren’t IDLE, but not actively posting, reset and allow a new run.
+    if (G.state !== 'IDLE') {
+      if (G.state === 'POSTING') return;  // still finishing previous submit; ignore
+      reset();                             // WAITING or other -> clean slate
     }
+
+    const { data:{ user } = {} } = await sb.auth.getUser();
+    if (!user) return log("Not signed in");
+
+    const { data, error } = await sb.rpc("start_run");
+    if (error) { 
+      console.error("start_run error:", error);
+      log("start_run error:", error.message || error); 
+      return; 
+    }
+    console.log("start_run data:", data);
+
+
+    G.token   = tokenFrom(data);
+    G.startAt = performance.now();
+    G.best    = 0;
+    G.state   = 'WAITING';
+    log("minted token", G.token);
+
+    // checkpoint state for this run
+    currentUserId  = user.id;
+    currentTokenId = G.token;
+    lastCheckpointSent = 0;
+    console.log('CKPT IDs', { currentUserId, currentTokenId });
+
+    hideTapOverlay();
+  }
+
 
     function onScore(n) {
       if (G.state !== 'WAITING') return;
@@ -461,69 +485,126 @@
       await loadBoard();
       reset();
     }
+    // --- Checkpoint poster ---
+    // --- Checkpoint poster ---
+  async function postCheckpoint(points) {
+    if (!currentTokenId || !currentUserId) return;
+
+    const { data, error } = await sb
+      .from('run_checkpoints')
+      .insert({
+        token: currentTokenId,
+        user_id: currentUserId,
+        points
+      })
+      .select('id')           // optional, helps confirm 201
+      .single()
+      .throwOnError();        // <— force errors to throw
+
+    // If we got here, insert worked
+    lastCheckpointSent = points;
+    console.log('checkpoint ok', points);
+  }
 
     // Messages from the game (same-origin)
-    window.addEventListener("message", (e) => {
-      if (e.origin && e.origin !== location.origin) return;
-      const m = e.data;
-      if (!m || typeof m !== "object") return;
-      if (m.type === "RUN_START") onRunStart();
-      else if (m.type === "SCORE") onScore(m.score);
-    }, { capture: true });
+  window.addEventListener("message", (e) => {
+  console.log('MSG', e.data); // TEMP
+
+  if (e.origin && e.origin !== location.origin) return;
+  const m = e.data;
+  if (!m || typeof m !== "object") return;
+
+  if (m.type === "RUN_START") {
+    onRunStart();
+  } else if (m.type === "SCORE") {
+    onScore(m.score);
+  } else if (m.type === "SCORE_TICK") {
+    if (!currentTokenId && G.state === 'IDLE') { onRunStart(); return; }
+    const s = Number(m.score) || 0;
+    if (s > lastCheckpointSent && (s === 1 || s >= lastCheckpointSent + CHECKPOINT_STEP)) {
+      postCheckpoint(s);
+    }
+  }
+}, { capture: true });
+
+
 
     // Hook iframe console to translate game logs → messages
     function hookIframeConsole() {
-      const f = gameFrame?.contentWindow;
-      if (!f || f.__sm_console_hooked) return;
-      try {
-        f.__sm_console_hooked = true;
-        const origLog = f.console.log.bind(f.console);
-        f.console.log = function(...args) {
-          try {
-            for (const a of args) {
-              if (typeof a !== "string") continue;
-              if (a.startsWith("notify_run_start()")) {
-                top.postMessage({ type: "RUN_START" }, "*");
-              } else {
-                const m = a.match(/^notify_score\((\d+)\)/);
-                if (m) top.postMessage({ type: "SCORE", score: Number(m[1]) }, "*");
+    const f = gameFrame?.contentWindow;
+    if (!f || f.__sm_console_hooked) return;
+    try {
+      f.__sm_console_hooked = true;
+      const origLog = f.console.log.bind(f.console);
+      f.console.log = function(...args) {
+        try {
+          for (const a of args) {
+            if (typeof a !== "string") continue;
+
+            if (a.startsWith("notify_run_start()")) {
+              top.postMessage({ type: "RUN_START" }, "*");
+
+            } else {
+              let m;
+
+              // EXISTING: final score
+              m = a.match(/^notify_score\((\d+)\)/);
+              if (m) {
+                top.postMessage({ type: "SCORE", score: Number(m[1]) }, "*");
+                continue;
+              }
+
+              // NEW: checkpoints -> translate to SCORE_TICK messages
+              m = a.match(/^notify_checkpoint\((\d+)\)/);
+              if (m) {
+                top.postMessage({ type: "SCORE_TICK", score: Number(m[1]) }, "*");
+                continue;
               }
             }
-          } catch {}
-          return origLog(...args);
-        };
-        log("iframe console hook active");
-      } catch (e) {
-        console.warn("[SM] hook error:", e.message);
-      }
+          }
+        } catch {}
+        return origLog(...args);
+      };
+      log("iframe console hook active");
+    } catch (e) {
+      console.warn("[SM] hook error:", e.message);
     }
+  }
+
 
     // Also wrap iframe globals if they ever exist
     function hookIframeGlobals() {
-      const f = gameFrame?.contentWindow;
-      if (!f) return;
-      const wrap = (name, handler) => {
-        try {
-          let fn = f[name];
-          if (typeof fn === "function" && !fn.__wrapped) {
-            const w = function(...a){ try{ handler(...a); }catch{} return fn.apply(this,a); };
-            w.__wrapped = true; f[name] = w; log("wrapped", name);
-          }
-          Object.defineProperty(f, name, {
-            configurable: true,
-            get(){ return fn; },
-            set(v){
-              if (typeof v === "function") {
-                fn = function(...a){ try{ handler(...a); }catch{} return v.apply(this,a); };
-                fn.__wrapped = true; log("wrapped future", name);
-              } else fn = v;
-            }
-          });
-        } catch {}
-      };
-      wrap("notify_run_start", () => onRunStart());
-      wrap("notify_score", (n) => onScore(n));
-    }
+  const f = gameFrame?.contentWindow;
+  if (!f) return;
+  const wrap = (name, handler) => {
+    try {
+      let fn = f[name];
+      if (typeof fn === "function" && !fn.__wrapped) {
+        const w = function(...a){ try{ handler(...a); }catch{} return fn.apply(this,a); };
+        w.__wrapped = true; f[name] = w; log("wrapped", name);
+      }
+      Object.defineProperty(f, name, {
+        configurable: true,
+        get(){ return fn; },
+        set(v){
+          if (typeof v === "function") {
+            fn = function(...a){ try{ handler(...a); }catch{} return v.apply(this,a); };
+            fn.__wrapped = true; log("wrapped future", name);
+          } else fn = v;
+        }
+      });
+    } catch {}
+  };
+
+  wrap("notify_run_start", () => onRunStart());
+  wrap("notify_score",     (n) => onScore(n));
+
+  // NEW: when game calls notify_checkpoint(n), emit SCORE_TICK so our listener handles it
+  wrap("notify_checkpoint", (n) => {
+    try { top.postMessage({ type: "SCORE_TICK", score: Number(n)||0 }, "*"); } catch {}
+  });
+}
+
 
     /* === Auto start attempts === */
     function dispatchBurstOn(el, fwin) {

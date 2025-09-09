@@ -116,6 +116,7 @@ def reset_run_flag():
 
 def notify_checkpoint(score: int):
     """Call whenever score increments, to prove progress."""
+    _dbg_log(f"notify_checkpoint({int(score)})")   # <-- visible in page console
     try:
         _post_to_parent({"type": "SCORE_TICK", "score": int(score)})
     except Exception:
@@ -129,7 +130,7 @@ WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Flappy Bara 🐹")
 # --- Game version (shown only on the start screen) ---
-GAME_VERSION = "v0.2.2"
+GAME_VERSION = "v0.2.3"
 
 
 # =========================
