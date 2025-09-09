@@ -130,7 +130,7 @@ WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Flappy Bara 🐹")
 # --- Game version (shown only on the start screen) ---
-GAME_VERSION = "v0.2.3"
+GAME_VERSION = "v0.2.4"
 
 
 # =========================

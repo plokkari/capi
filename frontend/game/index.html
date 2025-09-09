@@ -412,7 +412,7 @@
     let _lockPosting = false; // prevent overlaps between final flush and new runs
     const CHECKPOINT_STEP = 1; // send a checkpoint at 1,5,10,15,...
 
-    const MIN = 1.30; // must match DB trigger/validation
+    const MIN = 1.10; // must match DB trigger/validation
     const tokenFrom = (d) => { if (Array.isArray(d)) d = d[0]; return d?.token ?? d?.id ?? d; };
 
     const G = { state:'IDLE', token:null, startAt:0, best:0, timer:null, lastStart:0 };
