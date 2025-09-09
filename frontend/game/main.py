@@ -121,6 +121,9 @@ pygame.init()
 WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Flappy Bara 🐹")
+# --- Game version (shown only on the start screen) ---
+GAME_VERSION = "v0.2.1"
+
 
 # =========================
 #  AUDIO & MUTE SETUP
@@ -379,6 +382,8 @@ def _point_in(rect, pos): return rect.collidepoint(pos)
 
 CLOCK = pygame.time.Clock()
 FONT = pygame.font.SysFont("Arial", 32)
+VERSION_FONT = pygame.font.SysFont("Arial", 14)
+
 
 # --- Game variables ---
 # Time-based physics (device independent)
@@ -416,7 +421,7 @@ background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
 
 capy_img = load_img("flappy capy.png")
 capy_img = pygame.transform.scale(capy_img, (60, 45))
-capy_rect = pygame.Rect(0, 0, 30, 20)
+capy_rect = pygame.Rect(0, 0, 35, 25)
 capy_rect.center = (100, HEIGHT // 2)
 
 # =========================
@@ -885,6 +890,10 @@ while True:
         SCREEN.blit(capy_img, capy_img.get_rect(center=capy_rect.center))
         draw_text_center("Flappy Capy", 40, HEIGHT//4)
         draw_text_center("Press SPACE or TAP to Start", 22, HEIGHT//2)
+            # Show version only on the start screen (bottom-right corner)
+        _ver = VERSION_FONT.render(GAME_VERSION, True, (200, 200, 200))
+        SCREEN.blit(_ver, (WIDTH - _ver.get_width() - 6, HEIGHT - _ver.get_height() - 6))
+
 
     elif game_state == "ready":
         capy_rect.centery = int(HEIGHT*0.55 + 8*math.sin(pygame.time.get_ticks()*0.005))
