@@ -409,7 +409,8 @@
     let currentTokenId = null;
     let currentUserId  = null;
     let lastCheckpointSent = 0;
-    const CHECKPOINT_STEP = 5; // send a checkpoint at 1,5,10,15,...
+    let _lockPosting = false; // prevent overlaps between final flush and new runs
+    const CHECKPOINT_STEP = 1; // send a checkpoint at 1,5,10,15,...
 
     const MIN = 1.30; // must match DB trigger/validation
     const tokenFrom = (d) => { if (Array.isArray(d)) d = d[0]; return d?.token ?? d?.id ?? d; };
@@ -417,7 +418,8 @@
     const G = { state:'IDLE', token:null, startAt:0, best:0, timer:null, lastStart:0 };
     const reset = () => { G.state='IDLE'; G.token=null; G.startAt=0; G.best=0; if (G.timer){clearTimeout(G.timer); G.timer=null;} };
 
-      async function onRunStart() {
+  async function onRunStart() {
+    if (_lockPosting) return;  // don’t start a new run during final post
     const now = Date.now();
     if (now - G.lastStart < 400) return;  // was 800; make it easier to start
     G.lastStart = now;
@@ -431,7 +433,13 @@
     const { data:{ user } = {} } = await sb.auth.getUser();
     if (!user) return log("Not signed in");
 
-    const { data, error } = await sb.rpc("start_run");
+      /* CLEAR any leftovers from a previous run BEFORE minting a new token */
+      currentUserId       = null;
+      currentTokenId      = null;
+      lastCheckpointSent  = 0;
+
+      const { data, error } = await sb.rpc("start_run");
+
     if (error) { 
       console.error("start_run error:", error);
       log("start_run error:", error.message || error); 
@@ -462,7 +470,7 @@
       if (s <= 0 || s <= G.best) return;
       G.best = s;
       if (G.timer) clearTimeout(G.timer);
-      G.timer = setTimeout(postNow, 250);
+      G.timer = setTimeout(postNow, 350);
       log("best =", G.best);
     }
 
@@ -477,6 +485,10 @@
       const waitMs   = Math.max(0, Math.ceil((required - elapsed) * 1000));
       if (waitMs) { log("waiting", waitMs, "ms (anti-cheat)"); await new Promise(r=>setTimeout(r, waitMs)); }
 
+      if (lastCheckpointSent < G.best) {
+        await new Promise(r => setTimeout(r, 150)); // tiny settle to avoid race
+      }
+
       G.state = 'POSTING';
       const { error } = await sb.from("scores").insert({ user_id: user.id, token: G.token, score: G.best });
       if (error) { log("insert error:", error.message || error); reset(); return; }
@@ -485,43 +497,69 @@
       await loadBoard();
       reset();
     }
-    // --- Checkpoint poster ---
-    // --- Checkpoint poster ---
-  async function postCheckpoint(points) {
-    if (!currentTokenId || !currentUserId) return;
+    
+  // --- Checkpoint poster (snapshots token/user to avoid races) ---
+  async function postCheckpoint(points, tokenSnap = currentTokenId, userSnap = currentUserId) {
+    if (!tokenSnap || !userSnap) return;
+
+    // Make sure we’re still signed in as the same user the token was minted for
+    const { data:{ user } = {} } = await sb.auth.getUser();
+    if (!user || user.id !== userSnap) return; // avoid RLS 403 on session/user mismatch
 
     const { data, error } = await sb
       .from('run_checkpoints')
-      .insert({
-        token: currentTokenId,
-        user_id: currentUserId,
-        points
-      })
-      .select('id')           // optional, helps confirm 201
+      .insert({ token: tokenSnap, user_id: userSnap, points })
+      .select('id')
       .single()
-      .throwOnError();        // <— force errors to throw
+      .throwOnError();
 
-    // If we got here, insert worked
-    lastCheckpointSent = points;
-    console.log('checkpoint ok', points);
-  }
+    // Never move backwards if two calls race
+    lastCheckpointSent = Math.max(lastCheckpointSent, points);
+    if (DEBUG) console.log('checkpoint ok', points, 'tok=', tokenSnap);
+}
 
-    // Messages from the game (same-origin)
-  window.addEventListener("message", (e) => {
-  console.log('MSG', e.data); // TEMP
+
+
+    
+// Messages from the game (same-origin)
+window.addEventListener("message", async (e) => {
+  console.log('MSG', e.data);
 
   if (e.origin && e.origin !== location.origin) return;
   const m = e.data;
   if (!m || typeof m !== "object") return;
 
   if (m.type === "RUN_START") {
+    if (_lockPosting) return;      // ignore starts during final post
     onRunStart();
+
   } else if (m.type === "SCORE") {
-    onScore(m.score);
+    const s = Number(m.score) || 0;
+
+    // snapshot token/user *now* so new RUN_START can’t swap them mid-await
+    const tok = currentTokenId;
+    const uid = currentUserId;
+
+    // Lock during the final flush + score post
+    _lockPosting = true;
+    try {
+      // Ensure the DB has proof for this final score before inserting the score
+      if (s > lastCheckpointSent) {
+        try { await postCheckpoint(s, tok, uid); }
+        catch (e2) { console.warn('final ckpt failed', e2); /* trigger will enforce anyway */ }
+      }
+      onScore(s);
+    } finally {
+      _lockPosting = false;
+    }
+
   } else if (m.type === "SCORE_TICK") {
+    // If we somehow got a tick without a run, mint one
     if (!currentTokenId && G.state === 'IDLE') { onRunStart(); return; }
+
     const s = Number(m.score) || 0;
     if (s > lastCheckpointSent && (s === 1 || s >= lastCheckpointSent + CHECKPOINT_STEP)) {
+      // normal (non-final) checkpoints don't need the lock or await
       postCheckpoint(s);
     }
   }
@@ -574,6 +612,7 @@
 
     // Also wrap iframe globals if they ever exist
     function hookIframeGlobals() {
+      // Prevent overlapping run starts or final flush race
   const f = gameFrame?.contentWindow;
   if (!f) return;
   const wrap = (name, handler) => {
