@@ -130,7 +130,7 @@ WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Flappy Bara 🐹")
 # --- Game version (shown only on the start screen) ---
-GAME_VERSION = "v0.2.4"
+GAME_VERSION = "v0.2.5"
 
 
 # =========================
@@ -448,30 +448,93 @@ spawning_enabled = False
 next_spacing_x = OBSTACLE_SPACING_X
 
 def make_pillar_surface(gap_y, gap_size):
+    """
+    Render each pillar section as a soft gold coin stack:
+    - Left/right rim shading (horizontal gradient)
+    - Soft specular highlight band
+    - Subtle coin ridges (paired light/dark 1px lines)
+    """
     surf = pygame.Surface((OBSTACLE_WIDTH, HEIGHT), pygame.SRCALPHA)
-    coin_face = (245, 195, 50)
-    coin_edge = (180, 115, 30)
+
+    # --- Gold palette (less cartoony / less bright) ---
+    GOLD_SHADOW = (90, 70, 25)     # deep bronze
+    GOLD_MID    = (170, 135, 40)   # muted gold
+    GOLD_LIGHT  = (210, 190, 120)  # soft highlight (less bright)
+    
+    RIDGE_LIGHT  = (220, 200, 150, 80)# light ridge line (semi-transparent)
+    RIDGE_DARK   = (80, 60, 30, 70)   # shadow ridge line (semi-transparent)
+    BORDER_DARK  = (120, 85, 26, 180)   # inner border for definition
+
     gap_top = max(0, gap_y - gap_size // 2)
     gap_bot = min(HEIGHT, gap_y + gap_size // 2)
     top_rect    = pygame.Rect(0, 0, OBSTACLE_WIDTH, max(0, gap_top))
     bottom_rect = pygame.Rect(0, gap_bot, OBSTACLE_WIDTH, max(0, HEIGHT - gap_bot))
-    def draw_section(rect):
-        if rect.height <= 0: return
-        pygame.draw.rect(surf, coin_face, rect)
-        inset = rect.inflate(-2, -2)
-        if inset.width > 0 and inset.height > 0:
-            pygame.draw.rect(surf, coin_edge, inset, width=2)
-        band_h = 22
+
+    def lerp(a, b, t): return a + (b - a) * t
+    def lerp_color(c1, c2, t):
+        return (int(lerp(c1[0], c2[0], t)),
+                int(lerp(c1[1], c2[1], t)),
+                int(lerp(c1[2], c2[2], t)))
+
+    def fill_horizontal_gradient(target, rect, left_color, mid_color, right_color, mid_pos=0.38):
+        """Left->mid->right three-stop gradient across the width."""
+        w = rect.width
+        if w <= 0 or rect.height <= 0: return
+        for ix in range(w):
+            x = ix / max(1, w - 1)
+            if x <= mid_pos:
+                t = x / max(1e-6, mid_pos)
+                col = lerp_color(left_color, mid_color, t)
+            else:
+                t = (x - mid_pos) / max(1e-6, 1.0 - mid_pos)
+                col = lerp_color(mid_color, right_color, t)
+            pygame.draw.line(target, col, (rect.left + ix, rect.top), (rect.left + ix, rect.bottom - 1))
+
+    def draw_coin_ridges(target, rect, step=16):
+        # Two 1px lines (light then slight shadow) every 'step' pixels
         y = rect.top + 10
         while y < rect.bottom - 10:
-            band_top = max(rect.top + 2, y)
-            band_bottom = min(rect.bottom - 2, y + 6)
-            if band_bottom > band_top:
-                pygame.draw.rect(surf, coin_edge, (rect.left+4, band_top, rect.width-8, band_bottom-band_top))
-            y += band_h
-    draw_section(top_rect); draw_section(bottom_rect)
+            if rect.height <= 0: break
+            pygame.draw.line(target, RIDGE_LIGHT, (rect.left + 5, y),  (rect.right - 6, y))
+            y2 = y + 2
+            if y2 < rect.bottom - 2:
+                pygame.draw.line(target, RIDGE_DARK,  (rect.left + 5, y2), (rect.right - 6, y2))
+            y += step
+
+    def edge_sheen_and_border(target, rect):
+        # Slight left/right rim darkening and a slim specular band
+        pygame.draw.rect(target, (0, 0, 0, 60), (rect.left,        rect.top, 3, rect.height))  # left shadow
+        pygame.draw.rect(target, (0, 0, 0, 70), (rect.right - 4,   rect.top, 4, rect.height))  # right shadow
+        # Specular highlight band ~35% from the left
+        band_w = max(2, rect.width // 10)
+        band_x = rect.left + int(rect.width * 0.35)
+        highlight = pygame.Surface((band_w, rect.height), pygame.SRCALPHA)
+        for iy in range(rect.height):
+            t = 1.0 - abs((iy / max(1, rect.height - 1)) - 0.5) * 2.0  # stronger in the middle
+            a = int(20 + 20 * t)  # 20..40 alpha → much more subtle
+            pygame.draw.line(highlight, (255, 255, 255, a), (0, iy), (band_w - 1, iy))
+        target.blit(highlight, (band_x, rect.top))
+
+        # Soft inner border for definition (rounded a touch)
+        inset = rect.inflate(-2, -2)
+        if inset.width > 0 and inset.height > 0:
+            pygame.draw.rect(target, BORDER_DARK, inset, width=2, border_radius=6)
+
+    def draw_section(rect):
+        if rect.height <= 0: return
+        # base fill with a 3-stop horizontal gradient (gives "cylinder" feel)
+        fill_horizontal_gradient(surf, rect, GOLD_SHADOW, GOLD_LIGHT, GOLD_MID, mid_pos=0.40)
+        draw_coin_ridges(surf, rect, step=24)     # subtle 1px coin edges
+        edge_sheen_and_border(surf, rect)         # sheen + definition
+
+    draw_section(top_rect)
+    draw_section(bottom_rect)
+
+    # carve out the gap as transparent
     gap_rect = pygame.Rect(0, gap_top, OBSTACLE_WIDTH, max(0, gap_bot - gap_top))
-    if gap_rect.height > 0: surf.fill((0,0,0,0), gap_rect)
+    if gap_rect.height > 0:
+        surf.fill((0, 0, 0, 0), gap_rect)
+
     return surf
 
 def spawn_obstacle():
