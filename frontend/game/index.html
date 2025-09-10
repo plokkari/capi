@@ -519,6 +519,36 @@
 }
 
 
+async function postFinalScore(finalScore) {
+  // Force this score as the best, cancel any pending timer
+  if (G.timer) { clearTimeout(G.timer); G.timer = null; }
+  G.best = Number(finalScore) || 0;
+
+  // Anti-cheat wait (same as postNow)
+  const { data:{ user } = {} } = await sb.auth.getUser();
+  if (!user) { reset(); return; }
+
+  const elapsed  = (performance.now() - G.startAt) / 1000;
+  const required = G.best * MIN;
+  const waitMs   = Math.max(0, Math.ceil((required - elapsed) * 1000));
+  if (waitMs) { await new Promise(r => setTimeout(r, waitMs)); }
+
+  // tiny settle if the last checkpoint hasn’t hit yet
+  if (lastCheckpointSent < G.best) {
+    await new Promise(r => setTimeout(r, 150));
+  }
+
+  G.state = 'POSTING';
+  const { error } = await sb.from("scores").insert({ user_id: user.id, token: G.token, score: G.best });
+  if (error) {
+    log("insert error:", error.message || error);
+    reset();
+    return;
+  }
+  log("insert OK (score =", G.best, ")");
+  await loadBoard();
+  reset();
+}
 
     
 // Messages from the game (same-origin)
@@ -534,24 +564,27 @@ window.addEventListener("message", async (e) => {
     onRunStart();
 
   } else if (m.type === "SCORE") {
-    const s = Number(m.score) || 0;
+  const s = Number(m.score) || 0;
 
-    // snapshot token/user *now* so new RUN_START can’t swap them mid-await
-    const tok = currentTokenId;
-    const uid = currentUserId;
+  // snapshot token/user now so they can’t change mid-await
+  const tok = currentTokenId;
+  const uid = currentUserId;
 
-    // Lock during the final flush + score post
-    _lockPosting = true;
-    try {
-      // Ensure the DB has proof for this final score before inserting the score
-      if (s > lastCheckpointSent) {
-        try { await postCheckpoint(s, tok, uid); }
-        catch (e2) { console.warn('final ckpt failed', e2); /* trigger will enforce anyway */ }
-      }
-      onScore(s);
-    } finally {
-      _lockPosting = false;
+  _lockPosting = true;               // KEEP LOCKED until posting completes
+  try {
+    // Ensure DB has proof for this final score
+    if (s > lastCheckpointSent) {
+      try { await postCheckpoint(s, tok, uid); }
+      catch (e2) { console.warn('final ckpt failed', e2); /* trigger will guard anyway */ }
     }
+
+    // Post the final score immediately (no debounce)
+    await postFinalScore(s);
+
+  } finally {
+    _lockPosting = false;
+  }
+
 
   } else if (m.type === "SCORE_TICK") {
     // If we somehow got a tick without a run, mint one
