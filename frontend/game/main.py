@@ -130,7 +130,7 @@ WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Flappy Bara 🐹")
 # --- Game version (shown only on the start screen) ---
-GAME_VERSION = "v0.2.6"
+GAME_VERSION = "v0.2.7"
 # --- Flap cooldown (prevents double jumps on single tap) ---
 FLAP_CD_MS = 120
 last_flap_ms = 0
