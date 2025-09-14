@@ -30,6 +30,14 @@
   resize(); draw();
 })();
 
+// === Pump.fun config ===
+const BARA_MINT = '7eh9hELUXzyjfAaNjQM9AnNvfLNjij5NA65QmceRpump';
+const PUMP_ENDPOINT = `https://YOUR-WORKER.SUBDOMAIN.workers.dev/coins/${BARA_MINT}`;
+
+// Optional: if you deploy the proxy worker below, swap to that URL instead
+// const PUMP_ENDPOINT = `https://your-worker-subdomain.workers.dev/coins/${BARA_MINT}`;
+
+
 /* =========================
    Loader (themed, gradient bar, rotating tips)
 ========================= */
@@ -87,6 +95,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   requestAnimationFrame(tick);
 });
+
+// ===== $BARA LIVE CONFIG =====
+const BARA = {
+  address: "7eh9hELUXzyjfAaNjQM9AnNvfLNjij5NA65QmceRpump",
+  buyUrl: "https://pump.fun/coin/7eh9hELUXzyjfAaNjQM9AnNvfLNjij5NA65QmceRpump",
+  // where we fetch price/24h change (DexScreener)
+  priceApi: (addr) => `https://api.dexscreener.com/latest/dex/tokens/${addr}`,
+  // optional explorers you can surface later:
+  solscan: (addr) => `https://solscan.io/token/${addr}`,
+  birdeye: (addr) => `https://birdeye.so/token/${addr}?chain=solana`,
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Point all buy buttons to Pump.fun
+  document.querySelectorAll('a.cta, a[href*="buy-bara"], .btn.primary[data-buy="bara"]').forEach(a => {
+    a.href = BARA.buyUrl;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+  });
+});
+
+
 
 /* =========================
    Reveal-on-scroll
@@ -213,6 +243,8 @@ function initMemeChart(){
     }
   });
 
+  
+
   // refresh gradient once chart sizes to device pixels
   setTimeout(()=>{
     const h2 = wrap ? wrap.clientHeight : 320;
@@ -261,6 +293,86 @@ function initMemeChart(){
 
   updateUI(); start();
 }
+
+const priceEl  = document.getElementById('memePrice');
+const deltaEl  = document.getElementById('memeDelta');
+const noteEl   = document.getElementById('chartNote');
+
+async function fetchPumpCoin() {
+  const r = await fetch(PUMP_ENDPOINT, { cache: 'no-store' });
+  if (!r.ok) throw new Error('Pump.fun fetch failed');
+  const j = await r.json();
+
+  // Try multiple possible field names to be resilient
+  const price =
+    j.priceUsd ??
+    j.usdPrice ??
+    j.price_usd ??
+    j.price ??
+    j.currentPriceUsd ??
+    null;
+
+  // % change (if provided) — otherwise compute locally
+  const changePct =
+    j.change24h ??
+    j.change_24h ??
+    j.priceChange24h ??
+    null;
+
+  return { price: Number(price), changePct: changePct != null ? Number(changePct) : null };
+}
+
+function pushPricePoint(p) {
+  const t = new Date();
+  pricePoints.push({ t, p });
+
+  if (pricePoints.length > MAX_POINTS) pricePoints.shift();
+
+  // Update chart
+  const labels = pricePoints.map(x => x.t.toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'}));
+  const data   = pricePoints.map(x => x.p);
+
+  memeChart.data.labels = labels;
+  memeChart.data.datasets[0].data = data;
+  memeChart.update('none');
+}
+
+function updateUI(price, changePct) {
+  if (priceEl) priceEl.textContent = `$${price.toFixed(6)}`;
+
+  let delta = 0;
+  if (changePct != null) {
+    delta = changePct;
+  } else if (pricePoints.length > 1) {
+    const first = pricePoints[0].p;
+    delta = ((price - first) / first) * 100;
+  }
+
+  if (deltaEl) {
+    deltaEl.textContent = `${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%`;
+    deltaEl.classList.toggle('up', delta >= 0);
+    deltaEl.classList.toggle('down', delta < 0);
+  }
+
+  // Hide the “Demo data…” pill once we’ve shown live data
+  if (noteEl) noteEl.style.display = 'none';
+}
+
+async function pumpLoop() {
+  try {
+    const { price, changePct } = await fetchPumpCoin();
+    if (!isFinite(price) || price <= 0) throw new Error('Bad price payload');
+    pushPricePoint(price);
+    updateUI(price, changePct);
+  } catch (err) {
+    // Optional: show a subtle error or keep previous data
+    // console.debug(err);
+  } finally {
+    setTimeout(pumpLoop, 5000); // poll every 5s
+  }
+}
+pumpLoop();
+
 
 /* =========================
    Boot on page view
