@@ -131,6 +131,16 @@ SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Flappy Bara 🐹")
 # --- Game version (shown only on the start screen) ---
 GAME_VERSION = "v0.2.6"
+# --- Flap cooldown (prevents double jumps on single tap) ---
+FLAP_CD_MS = 120
+last_flap_ms = 0
+
+def try_flap():
+    global last_flap_ms
+    now = pygame.time.get_ticks()
+    if now - last_flap_ms >= FLAP_CD_MS:
+        last_flap_ms = now
+        flap()
 
 
 # =========================
@@ -857,6 +867,10 @@ def draw_challenge_overlay():
 # =========================
 last_time = time.perf_counter()
 
+# --- Focus/visibility resume guards ---
+was_window_active = pygame.display.get_active()
+resume_unignore_until = 0.0  # perf_counter() timestamp; ignore flaps until this
+
 while True:
     now = time.perf_counter()
     dt = now - last_time
@@ -866,6 +880,18 @@ while True:
     _poll_parent_best()
     game_active = (game_state == "play")
     paused_for_focus = game_active and (not pygame.display.get_active())
+
+    # Detect tab/window resume and guard against queued input bursts
+    window_active = pygame.display.get_active()
+    if was_window_active is False and window_active is True:
+        # Clear any queued clicks/keys that arrived while backgrounded
+        try:
+            pygame.event.clear([pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN, pygame.TEXTINPUT])
+        except Exception:
+            pass
+        # Ignore flaps for a short grace period after resume
+        resume_unignore_until = time.perf_counter() + 0.15  # 150 ms
+
 
     for event in pygame.event.get():
         # --- MUTE BUTTON CLICK: consume the event so it doesn't trigger game actions ---
@@ -900,8 +926,11 @@ while True:
 
             elif game_state == "play":
                 if not paused_for_focus and event.key == pygame.K_SPACE:
-                    maybe_start_music()
-                    try_flap()
+                    if time.perf_counter() >= resume_unignore_until:
+                        maybe_start_music()
+                        try_flap()
+                    continue
+
 
             elif game_state == "challenge":
                 # BACKSPACE still arrives as KEYDOWN on soft keyboards / desktop
@@ -946,8 +975,10 @@ while True:
                     pass
                 enter_play()
             elif game_state == "play" and not paused_for_focus:
-                maybe_start_music()
-                try_flap()
+                if time.perf_counter() >= resume_unignore_until:
+                    maybe_start_music()
+                    try_flap()
+                continue
             elif game_state == "gameover":
                 if time.time() - gameover_time > 1:
                     reset_game(); game_state = "ready"
@@ -1084,5 +1115,6 @@ while True:
     # --- Draw the mute button LAST so it stays on top of pillars/overlays ---
     draw_mute_button()
 
+    was_window_active = window_active
     pygame.display.update()
     CLOCK.tick(60)
