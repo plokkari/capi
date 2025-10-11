@@ -701,8 +701,7 @@ if (gameFrame) {
     if (lastMyBest != null) setMyBestInGame(lastMyBest);
   });
 
-  gameFrame.src = "build/web/index.html?v=1";        // or "./build/web/index.html?v=1"
-
+  gameFrame.src = "/frontend/game/build/web/index.html?v=1";
 } else {
   console.warn('No <iframe id="gameFrame"> found on the page.');
 }
@@ -877,8 +876,7 @@ function installGateBusterInIframe() {
       });
 
       // set src AFTER listeners are attached
-      gameFrame.src = "build/web/index.html?v=1";        // or "./build/web/index.html?v=1"
-
+      gameFrame.src = "/frontend/game/build/web/index.html?v=1";
     } else {
       console.warn('No <iframe id="gameFrame"> found on the page.');
     }
