@@ -128,7 +128,7 @@ def notify_checkpoint(score: int):
 pygame.init()
 WIDTH, HEIGHT = 400, 600
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Flappy Bara 🐹")
+pygame.display.set_caption("Flappy")
 # --- Game version (shown only on the start screen) ---
 GAME_VERSION = "v0.2.8"
 # --- Flap cooldown (prevents double jumps on single tap) ---
@@ -437,7 +437,7 @@ def try_flap():
 background_img = load_img("capy back.png").convert()
 background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
 
-capy_img = load_img("flappy capy.png")
+capy_img = load_img("fly.png")
 capy_img = pygame.transform.scale(capy_img, (60, 45))
 capy_rect = pygame.Rect(0, 0, 35, 25)
 capy_rect.center = (100, HEIGHT // 2)
@@ -990,7 +990,7 @@ while True:
     if game_state == "start":
         capy_rect.centery = int(HEIGHT*0.55 + 8*math.sin(pygame.time.get_ticks()*0.005))
         SCREEN.blit(capy_img, capy_img.get_rect(center=capy_rect.center))
-        draw_text_center("Flappy Capy", 40, HEIGHT//4)
+        draw_text_center("Flappy", 40, HEIGHT//4)
         draw_text_center("Press SPACE or TAP to Start", 22, HEIGHT//2)
             # Show version only on the start screen (bottom-right corner)
         _ver = VERSION_FONT.render(GAME_VERSION, True, (200, 200, 200))
