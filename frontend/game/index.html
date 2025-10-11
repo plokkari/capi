@@ -271,9 +271,10 @@
         email,
         options: {
           shouldCreateUser: true,
-          emailRedirectTo: window.location.origin + "/game/"
+          emailRedirectTo: "https://cosmoalien.xyz/frontend/game/index.html",
         }
       });
+
       alert(error ? error.message : "A link or a 6-digit code was emailed to you.");
     };
     verifyOtpBtn.onclick = async () => {
